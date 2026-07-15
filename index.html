@@ -6,8 +6,17 @@
 <title>Store Ops Live — Base Dump Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:,">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+// Fallbacks if a CDN is blocked or fails
+if(typeof Papa === 'undefined'){ document.write('<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"><\/script>'); }
+if(typeof Chart === 'undefined'){ document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"><\/script>'); }
+</script>
+<script>
+if(typeof Chart === 'undefined'){ document.write('<script src="https://unpkg.com/chart.js@4.4.4/dist/chart.umd.min.js"><\/script>'); }
+</script>
 <style>
 :root{
   --paper:#F4F6F4;
@@ -505,7 +514,13 @@ function renderFunnel(rows){
 const COLORS = {'On Time':'#0E8A4C','LM Delay':'#C6373C','Pickup Delay':'#C77D0A','Creation to Accept Delay':'#0F5257','Unattributed':'#9AA6A0'};
 function colorFor(src,i){ return COLORS[src] || ['#6B4E9B','#2E7DAF','#B0578D','#7A6A2F'][i%4]; }
 
+function chartsAvailable(){ return typeof Chart !== 'undefined'; }
+function chartUnavailableMsg(canvasId){
+  const box = $(canvasId).parentElement;
+  box.innerHTML = '<div class="skel">Chart library couldn\'t load on this network — data below is unaffected. Try a hard refresh (Ctrl+Shift+R).</div>';
+}
 function renderCharts(rows){
+  if(!chartsAvailable()){ chartUnavailableMsg('hourChart'); chartUnavailableMsg('delayChart'); return; }
   // hourly
   const hours = [...Array(24).keys()];
   const byHour = hours.map(h=>rows.filter(r=>r.hour===h));
@@ -621,12 +636,14 @@ function openStore(hub){
   const counts = {};
   s.rows.forEach(r=>counts[r.delaySource]=(counts[r.delaySource]||0)+1);
   const labels = Object.keys(counts);
+  if(chartsAvailable()){
   if(charts.mDelay) charts.mDelay.destroy();
   charts.mDelay = new Chart($('mDelayChart'), {
     type:'doughnut',
     data:{labels, datasets:[{data:labels.map(l=>counts[l]), backgroundColor:labels.map((l,i)=>colorFor(l,i)), borderWidth:2, borderColor:'#fff'}]},
     options:{maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:12,font:{family:'Archivo',size:11}}}}}
   });
+  } else { chartUnavailableMsg('mDelayChart'); }
 
   // riders
   const rmap = new Map();
@@ -677,11 +694,12 @@ function renderAll(){
   const stores = aggStores(rows);
   $('rowChip').textContent = fmtN(rows.length) + ' orders';
   $('storeChip').textContent = fmtN(stores.length) + ' stores';
-  renderKpis(rows);
-  renderAlerts(rows, stores);
-  renderFunnel(rows);
-  renderCharts(rows);
-  renderStores(stores);
+  const safe = (fn, name) => { try { fn(); } catch(e){ console.error('Section failed:', name, e); } };
+  safe(()=>renderKpis(rows), 'kpis');
+  safe(()=>renderAlerts(rows, stores), 'alerts');
+  safe(()=>renderFunnel(rows), 'funnel');
+  safe(()=>renderCharts(rows), 'charts');
+  safe(()=>renderStores(stores), 'stores');
   $('foot').textContent = `source: Google Sheet · tab "${cfg.sheetName}" · ${fmtN(rawRows.length)} total rows loaded · auto-refresh every ${cfg.intervalSec/60} min`;
 }
 
@@ -760,9 +778,11 @@ $('applySettings').onclick = ()=>{
 };
 
 /* ================= BOOT ================= */
-Chart.defaults.font.family = "'IBM Plex Mono', monospace";
-Chart.defaults.font.size = 10.5;
-Chart.defaults.color = '#4E5B54';
+if(chartsAvailable()){
+  Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+  Chart.defaults.font.size = 10.5;
+  Chart.defaults.color = '#4E5B54';
+}
 refresh();
 </script>
 </body>
