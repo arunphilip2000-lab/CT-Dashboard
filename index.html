@@ -1,789 +1,222 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Store Ops Live — Base Dump Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="icon" href="data:,">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
-<script>
-// Fallbacks if a CDN is blocked or fails
-if(typeof Papa === 'undefined'){ document.write('<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"><\/script>'); }
-if(typeof Chart === 'undefined'){ document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"><\/script>'); }
-</script>
-<script>
-if(typeof Chart === 'undefined'){ document.write('<script src="https://unpkg.com/chart.js@4.4.4/dist/chart.umd.min.js"><\/script>'); }
-</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Live Stores Performance — Amazonnow LIVE</title>
 <style>
-:root{
-  --paper:#F4F6F4;
-  --panel:#FFFFFF;
-  --ink:#17211C;
-  --ink-soft:#4E5B54;
-  --line:#DDE3DE;
-  --petrol:#0F5257;
-  --petrol-deep:#093A3E;
-  --green:#0E8A4C;
-  --green-bg:#E4F3EA;
-  --amber:#C77D0A;
-  --amber-bg:#FBF0DA;
-  --red:#C6373C;
-  --red-bg:#F9E4E4;
-  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
-  --sans:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px}
-button{font-family:inherit;cursor:pointer}
-select,input{font-family:inherit}
+  :root {
+    --bg: #f6f7fb;
+    --card-bg: #ffffff;
+    --card-border: #e7e9f0;
+    --label: #6b7a99;
+    --value-dark: #1c2333;
+    --red: #e0294a;
+    --green: #1a9c5a;
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  }
 
-/* ---------- top bar ---------- */
-.topbar{background:var(--petrol-deep);color:#EAF4F2;padding:0 20px;display:flex;align-items:center;gap:18px;height:62px;position:sticky;top:0;z-index:50}
-.brand{display:flex;flex-direction:column;line-height:1.05}
-.brand .t{font-weight:800;font-size:19px;letter-spacing:.02em;font-stretch:85%}
-.brand .s{font-family:var(--mono);font-size:10.5px;color:#8FB8B4;letter-spacing:.08em;text-transform:uppercase}
-.scanline{flex:1;height:4px;border-radius:2px;background:#0F5257;position:relative;overflow:hidden;min-width:60px}
-.scanline::after{content:"";position:absolute;top:0;left:-30%;width:30%;height:100%;background:linear-gradient(90deg,transparent,#7FE0C3,transparent);animation:scan 2.4s linear infinite}
-@keyframes scan{to{left:110%}}
-@media (prefers-reduced-motion:reduce){.scanline::after{animation:none}}
-.liveblock{display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:12px}
-.pulse{width:9px;height:9px;border-radius:50%;background:#4ADE80;box-shadow:0 0 0 0 rgba(74,222,128,.6);animation:pulse 2s infinite}
-@keyframes pulse{70%{box-shadow:0 0 0 8px rgba(74,222,128,0)}}
-.pulse.err{background:#F87171;animation:none}
-.liveblock .lbl{color:#8FB8B4}
-.btn{background:#124F53;border:1px solid #2C6B6E;color:#EAF4F2;border-radius:6px;padding:7px 13px;font-size:12.5px;font-weight:600}
-.btn:hover{background:#1A6266}
-.btn.ghost{background:transparent}
-.countwrap{display:flex;align-items:center;gap:7px}
-.ring{width:26px;height:26px;transform:rotate(-90deg)}
-.ring circle{fill:none;stroke-width:3}
-.ring .bg{stroke:#2C6B6E}
-.ring .fg{stroke:#7FE0C3;stroke-linecap:round;transition:stroke-dashoffset 1s linear}
+  * { box-sizing: border-box; }
 
-/* ---------- layout ---------- */
-.wrap{max-width:1460px;margin:0 auto;padding:18px 20px 60px}
-.section-h{display:flex;align-items:baseline;gap:10px;margin:26px 0 10px}
-.section-h h2{font-size:15px;font-weight:700;letter-spacing:.01em}
-.section-h .hint{font-size:12px;color:var(--ink-soft)}
+  body {
+    margin: 0;
+    padding: 32px;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--value-dark);
+  }
 
-/* ---------- status / error ---------- */
-.notice{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:26px;margin-top:16px}
-.notice h3{margin-bottom:8px;font-size:16px}
-.notice p{color:var(--ink-soft);line-height:1.55;margin-bottom:6px;max-width:760px}
-.notice code{font-family:var(--mono);font-size:12px;background:var(--paper);padding:2px 6px;border-radius:4px}
-.notice ol{margin:10px 0 0 20px;color:var(--ink-soft);line-height:1.7}
+  .page-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--value-dark);
+    margin: 0 0 18px 2px;
+  }
 
-/* ---------- KPI strip ---------- */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:16px}
-.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 15px 11px;position:relative;overflow:hidden}
-.kpi .k{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-soft);font-weight:600}
-.kpi .v{font-family:var(--mono);font-size:26px;font-weight:600;margin-top:4px;line-height:1}
-.kpi .d{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:5px}
-.kpi .edge{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--petrol)}
-.kpi.good .edge{background:var(--green)} .kpi.warn .edge{background:var(--amber)} .kpi.bad .edge{background:var(--red)}
-.kpi.good .v{color:var(--green)} .kpi.warn .v{color:var(--amber)} .kpi.bad .v{color:var(--red)}
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--value-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin: 32px 0 14px 2px;
+  }
 
-/* ---------- filters ---------- */
-.filters{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.filters label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);font-weight:600;margin-right:4px}
-.filters select,.filters input[type=text]{border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:13px;background:var(--paper);color:var(--ink)}
-.filters .grp{display:flex;align-items:center;gap:4px}
-.chip{font-family:var(--mono);font-size:11px;background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:3px 10px;color:var(--ink-soft)}
+  .card-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
 
-/* ---------- alerts ---------- */
-.alerts{margin-top:16px;border:1px solid #EFC9C9;background:#FDF6F6;border-radius:10px;overflow:hidden}
-.alerts.ok{border-color:#C9E5D2;background:#F4FBF6}
-.alerts .head{display:flex;align-items:center;gap:10px;padding:11px 15px;cursor:pointer;user-select:none}
-.alerts .head .cnt{font-family:var(--mono);font-weight:600}
-.alerts .head .tag{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:5px;background:var(--red);color:#fff}
-.alerts.ok .head .tag{background:var(--green)}
-.alerts .body{display:none;border-top:1px solid #EFC9C9;max-height:280px;overflow:auto}
-.alerts.open .body{display:block}
-.alerts table{width:100%;border-collapse:collapse;font-size:12.5px}
-.alerts th,.alerts td{padding:7px 14px;text-align:left;border-bottom:1px solid #F3E2E2}
-.alerts th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);position:sticky;top:0;background:#FDF6F6}
-.alerts td.mono, td.mono{font-family:var(--mono);font-size:12px}
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 16px 20px;
+    width: 210px;
+    min-height: 84px;
+  }
 
-/* ---------- charts ---------- */
-.charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
-@media(max-width:980px){.charts{grid-template-columns:1fr}}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
-.card h3{font-size:13.5px;font-weight:700;margin-bottom:2px}
-.card .sub{font-size:11.5px;color:var(--ink-soft);margin-bottom:10px}
-.chartbox{position:relative;height:280px}
+  .card .label {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--label);
+    text-transform: uppercase;
+    line-height: 1.4;
+    margin-bottom: 10px;
+  }
 
-/* ---------- funnel ---------- */
-.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:6px}
-.stage{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 15px;position:relative}
-.stage .n{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);font-weight:600}
-.stage .m{font-family:var(--mono);font-size:22px;font-weight:600;margin-top:4px}
-.stage .m span{font-size:12px;color:var(--ink-soft);font-weight:400}
-.stage .p90{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:4px}
-.stage::after{content:"→";position:absolute;right:-13px;top:50%;transform:translateY(-50%);color:var(--ink-soft);z-index:2;font-size:15px}
-.stage:last-child::after{display:none}
+  .card .value {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+  }
 
-/* ---------- store table ---------- */
-.tablecard{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:6px;overflow:hidden}
-.tscroll{overflow:auto;max-height:600px}
-table.stores{width:100%;border-collapse:collapse;font-size:12.5px;min-width:1080px}
-.stores th{position:sticky;top:0;background:var(--petrol-deep);color:#D8EAE7;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px;text-align:right;cursor:pointer;user-select:none;white-space:nowrap;z-index:3}
-.stores th:first-child,.stores th:nth-child(2){text-align:left}
-.stores th .arr{color:#7FE0C3}
-.stores td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);font-size:12px;white-space:nowrap}
-.stores td.store{font-family:var(--sans);font-weight:600;text-align:left;font-size:12.5px}
-.stores td.city{font-family:var(--sans);text-align:left;color:var(--ink-soft)}
-.stores tbody tr{cursor:pointer}
-.stores tbody tr:hover{background:#F0F5F1}
-.rag{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:1px}
-.rag.g{background:var(--green)} .rag.a{background:var(--amber)} .rag.r{background:var(--red)}
-.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px}
-.pill.g{background:var(--green-bg);color:var(--green)}
-.pill.a{background:var(--amber-bg);color:var(--amber)}
-.pill.r{background:var(--red-bg);color:var(--red)}
-.heat{display:inline-block;height:8px;border-radius:4px;background:var(--line);vertical-align:middle;margin-left:8px;overflow:hidden;width:56px}
-.heat i{display:block;height:100%;background:var(--green)}
-.heat.a i{background:var(--amber)} .heat.r i{background:var(--red)}
+  .value.dark { color: var(--value-dark); }
+  .value.red  { color: var(--red); }
+  .value.green { color: var(--green); }
 
-/* ---------- modal ---------- */
-.overlay{position:fixed;inset:0;background:rgba(9,26,24,.55);display:none;z-index:100;align-items:flex-start;justify-content:center;padding:34px 16px;overflow:auto}
-.overlay.open{display:flex}
-.modal{background:var(--paper);border-radius:14px;max-width:1060px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.3)}
-.modal .mh{background:var(--petrol-deep);color:#EAF4F2;border-radius:14px 14px 0 0;padding:16px 22px;display:flex;align-items:center;gap:14px}
-.modal .mh h3{font-size:17px;font-weight:800;font-stretch:88%}
-.modal .mh .mono{font-family:var(--mono);font-size:11.5px;color:#8FB8B4}
-.modal .mh button{margin-left:auto}
-.modal .mb{padding:18px 22px 24px}
-.minikpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px}
-.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
-@media(max-width:860px){.mgrid{grid-template-columns:1fr}}
-.mtable{width:100%;border-collapse:collapse;font-size:12px}
-.mtable th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
-.mtable td{padding:6px 8px;border-bottom:1px solid var(--line)}
-.mtable td.mono{font-family:var(--mono);font-size:11.5px}
+  .table-wrap {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+  }
 
-/* ---------- settings ---------- */
-.settings{position:fixed;top:70px;right:20px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;width:330px;box-shadow:0 14px 40px rgba(0,0,0,.16);display:none;z-index:90}
-.settings.open{display:block}
-.settings h4{font-size:13px;margin-bottom:10px}
-.settings label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-weight:600;margin:10px 0 4px}
-.settings input,.settings select{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:12.5px;background:var(--paper)}
-.settings .apply{margin-top:14px;width:100%;background:var(--petrol);color:#fff;border:none;border-radius:6px;padding:9px;font-weight:700}
-.foot{margin-top:26px;font-family:var(--mono);font-size:11px;color:var(--ink-soft);text-align:center}
-.skel{color:var(--ink-soft);font-family:var(--mono);font-size:12px;padding:30px;text-align:center}
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: #fafbfd;
+    color: var(--label);
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    font-weight: 700;
+    text-align: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  thead th:nth-child(2), thead th:nth-child(3) { text-align: left; }
+
+  tbody td {
+    padding: 8px 12px;
+    text-align: center;
+    border-bottom: 1px solid #f0f1f6;
+    color: var(--value-dark);
+  }
+
+  tbody td:nth-child(2), tbody td:nth-child(3) { text-align: left; }
+
+  tbody tr:nth-child(even) { background: #fbfcfe; }
+  tbody tr:hover { background: #f0f4ff; }
+
+  tr.total-row td {
+    font-weight: 700;
+    background: #eef1f8 !important;
+    border-top: 2px solid #d7dcea;
+  }
+
+  .red-txt { color: var(--red); font-weight: 600; }
+  .green-txt { color: var(--green); font-weight: 600; }
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <div class="brand">
-    <div class="t">STORE OPS LIVE</div>
-    <div class="s">Base Dump · All Stores</div>
+  <div class="page-title">Live Stores Performance — Amazonnow LIVE</div>
+
+  <div class="card-grid">
+
+    <div class="card">
+      <div class="label">Total OPD<br>(31 hubs)</div>
+      <div class="value dark">1,978</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Total DAU</div>
+      <div class="value dark">250</div>
+    </div>
+
+    <div class="card">
+      <div class="label">OR2A (Wt Avg)</div>
+      <div class="value red">1.28</div>
+    </div>
+
+    <div class="card">
+      <div class="label">S2P (Wt Avg)</div>
+      <div class="value green">2.04</div>
+    </div>
+
+    <div class="card">
+      <div class="label">OTP+3min (Wt Avg)</div>
+      <div class="value green">90.0%</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Rider Delay (Wt Avg)</div>
+      <div class="value red">7.9%</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Store Delay (Wt Avg)</div>
+      <div class="value red">2.1%</div>
+    </div>
+
   </div>
-  <div class="scanline"></div>
-  <div class="liveblock">
-    <div class="pulse" id="pulse"></div>
-    <div><span class="lbl">last sync</span> <span id="lastSync">—</span></div>
-    <div class="countwrap">
-      <svg class="ring" viewBox="0 0 26 26"><circle class="bg" cx="13" cy="13" r="10"></circle><circle class="fg" id="ringFg" cx="13" cy="13" r="10" stroke-dasharray="62.8" stroke-dashoffset="0"></circle></svg>
-      <span id="countdown">—</span>
-    </div>
+
+  <div class="section-title">Hub-level performance (31 hubs, sorted by Rider delay % descending)</div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>SLNO</th><th>City_name</th><th>Hub_name</th><th>OPD</th><th>DAU</th><th>OR2A (p75)</th><th>S2P (p75)</th><th>Avg. Creation to pack</th><th>Avg. Creation to Geofence</th><th>Avg LM</th><th>OTP+3min</th><th>Rider delay</th><th>Store Delay</th><th>BTS%</th><th>BTO%</th><th>DSR</th><th>FOD</th></tr>
+      </thead>
+      <tbody>
+      <tr class=""><td class="">1</td><td class="">Chennai</td><td class="">CHN_Royapettah_ANow_TCF7</td><td class="">53</td><td class="">6.0</td><td class="">29.80</td><td class="">1.47</td><td class="">2.7</td><td class="">51.2</td><td class="">3.5</td><td class="green-txt">26.4%</td><td class="red-txt">66.6%</td><td class="red-txt">6.9%</td><td class="">14.8</td><td class="">73.6%</td><td class="">98.1%</td><td class="">1</td></tr>
+      <tr class=""><td class="">2</td><td class="">Bengaluru</td><td class="">BLR_Sidedahalli_ANow_TBW4</td><td class="">106</td><td class="">13.0</td><td class="">1.27</td><td class="">1.88</td><td class="">0.9</td><td class="">45.0</td><td class="">4.2</td><td class="green-txt">69.8%</td><td class="red-txt">30.2%</td><td class="red-txt">0.0%</td><td class="">22.1</td><td class="">30.2%</td><td class="">95.3%</td><td class="">3</td></tr>
+      <tr class=""><td class="">3</td><td class="">Faridabad</td><td class="">NCR_MathurRoad_ANow_TFB5</td><td class="">14</td><td class="">3.0</td><td class="">0.28</td><td class="">3.67</td><td class="">2.4</td><td class="">31.0</td><td class="">4.6</td><td class="green-txt">78.6%</td><td class="red-txt">19.9%</td><td class="red-txt">1.5%</td><td class="">9.0</td><td class="">21.4%</td><td class="">92.9%</td><td class="">1</td></tr>
+      <tr class=""><td class="">4</td><td class="">Mumbai</td><td class="">MUM_BapatMarg_ANow_TMQ9</td><td class="">11</td><td class="">3.0</td><td class="">1.10</td><td class="">2.40</td><td class="">1.9</td><td class="">37.7</td><td class="">1.7</td><td class="green-txt">81.8%</td><td class="red-txt">16.5%</td><td class="red-txt">1.7%</td><td class="">17.3</td><td class="">18.2%</td><td class="">90.9%</td><td class="">1</td></tr>
+      <tr class=""><td class="">5</td><td class="">Delhi</td><td class="">NCR_Pitampura_ANow_TDN2</td><td class="">17</td><td class="">4.0</td><td class="">1.20</td><td class="">2.57</td><td class="">2.3</td><td class="">18.7</td><td class="">0.9</td><td class="green-txt">82.4%</td><td class="red-txt">14.5%</td><td class="red-txt">3.1%</td><td class="">3.6</td><td class="">17.6%</td><td class="">100.0%</td><td class="">0</td></tr>
+      <tr class=""><td class="">6</td><td class="">Bengaluru</td><td class="">BLR_KengeriHobli_ANow_TBR7</td><td class="">67</td><td class="">5.0</td><td class="">0.70</td><td class="">7.02</td><td class="">4.6</td><td class="">31.2</td><td class="">2.1</td><td class="green-txt">67.2%</td><td class="red-txt">11.8%</td><td class="red-txt">21.1%</td><td class="">16.9</td><td class="">32.8%</td><td class="">100.0%</td><td class="">0</td></tr>
+      <tr class=""><td class="">7</td><td class="">Delhi</td><td class="">NCR_Meharulidt_ANow_TDO3</td><td class="">70</td><td class="">9.0</td><td class="">0.30</td><td class="">2.52</td><td class="">2.1</td><td class="">27.8</td><td class="">1.7</td><td class="green-txt">87.1%</td><td class="red-txt">9.2%</td><td class="red-txt">3.7%</td><td class="">13.3</td><td class="">10.0%</td><td class="">95.7%</td><td class="">1</td></tr>
+      <tr class=""><td class="">8</td><td class="">Delhi</td><td class="">NCR_UttamNagar_ANow_TDL6</td><td class="">45</td><td class="">7.0</td><td class="">0.60</td><td class="">2.32</td><td class="">3.8</td><td class="">29.4</td><td class="">2.2</td><td class="green-txt">88.9%</td><td class="red-txt">8.9%</td><td class="red-txt">2.2%</td><td class="">11.2</td><td class="">11.1%</td><td class="">100.0%</td><td class="">0</td></tr>
+      <tr class=""><td class="">9</td><td class="">Noida</td><td class="">NCR_Buddhanagar_ANow_TNG9</td><td class="">100</td><td class="">14.0</td><td class="">1.32</td><td class="">1.95</td><td class="">1.8</td><td class="">35.8</td><td class="">3.6</td><td class="green-txt">91.0%</td><td class="red-txt">8.5%</td><td class="red-txt">0.4%</td><td class="">17.3</td><td class="">9.0%</td><td class="">99.0%</td><td class="">0</td></tr>
+      <tr class=""><td class="">10</td><td class="">Ahmedabad</td><td class="">AMD_Solaoverbridge_ANow_TEA3</td><td class="">99</td><td class="">14.0</td><td class="">0.20</td><td class="">2.03</td><td class="">1.6</td><td class="">27.7</td><td class="">2.2</td><td class="green-txt">92.9%</td><td class="red-txt">6.8%</td><td class="red-txt">0.3%</td><td class="">15.4</td><td class="">7.1%</td><td class="">99.0%</td><td class="">1</td></tr>
+      <tr class=""><td class="">11</td><td class="">Faridabad</td><td class="">NCR_Faridabad_ANow_TFB1</td><td class="">79</td><td class="">10.0</td><td class="">0.50</td><td class="">2.60</td><td class="">2.3</td><td class="">23.7</td><td class="">1.6</td><td class="green-txt">92.4%</td><td class="red-txt">6.3%</td><td class="red-txt">1.2%</td><td class="">12.4</td><td class="">7.6%</td><td class="">100.0%</td><td class="">0</td></tr>
+      <tr class=""><td class="">12</td><td class="">Chandigarh</td><td class="">CHA_Punchkula_ANow_TOA9</td><td class="">93</td><td class="">8.0</td><td class="">0.20</td><td class="">2.60</td><td class="">2.0</td><td class="">19.1</td><td class="">1.9</td><td class="green-txt">93.5%</td><td class="red-txt">5.9%</td><td class="red-txt">0.6%</td><td class="">7.0</td><td class="">6.5%</td><td class="">96.8%</td><td class="">3</td></tr>
+      <tr class=""><td class="">13</td><td class="">Gurgaon</td><td class="">NCR_IMTManesar_ANow_TDK8</td><td class="">68</td><td class="">8.0</td><td class="">0.82</td><td class="">1.51</td><td class="">1.4</td><td class="">21.7</td><td class="">2.1</td><td class="green-txt">94.1%</td><td class="red-txt">5.4%</td><td class="red-txt">0.4%</td><td class="">10.0</td><td class="">5.9%</td><td class="">94.1%</td><td class="">3</td></tr>
+      <tr class=""><td class="">14</td><td class="">Jaipur</td><td class="">JAI_TonkPhatak_ANow_TJB2</td><td class="">86</td><td class="">8.0</td><td class="">0.17</td><td class="">2.68</td><td class="">2.0</td><td class="">18.3</td><td class="">1.9</td><td class="green-txt">94.2%</td><td class="red-txt">5.2%</td><td class="red-txt">0.6%</td><td class="">6.5</td><td class="">5.8%</td><td class="">97.7%</td><td class="">1</td></tr>
+      <tr class=""><td class="">15</td><td class="">Gurgaon</td><td class="">NCR_Chauma_ANow_TFA5</td><td class="">88</td><td class="">14.0</td><td class="">0.70</td><td class="">2.26</td><td class="">1.8</td><td class="">25.3</td><td class="">1.9</td><td class="green-txt">88.6%</td><td class="red-txt">3.4%</td><td class="red-txt">8.0%</td><td class="">10.8</td><td class="">10.2%</td><td class="">98.9%</td><td class="">0</td></tr>
+      <tr class=""><td class="">16</td><td class="">Ghaziabad</td><td class="">NCR_Mohannagar_ANow_TZA2</td><td class="">93</td><td class="">8.0</td><td class="">0.20</td><td class="">2.53</td><td class="">1.8</td><td class="">22.9</td><td class="">2.4</td><td class="green-txt">91.4%</td><td class="red-txt">3.3%</td><td class="red-txt">5.3%</td><td class="">9.4</td><td class="">8.6%</td><td class="">94.6%</td><td class="">1</td></tr>
+      <tr class=""><td class="">17</td><td class="">Chandigarh</td><td class="">CHA_Mohali_ANow_TOB1</td><td class="">33</td><td class="">5.0</td><td class="">0.70</td><td class="">2.27</td><td class="">1.9</td><td class="">14.8</td><td class="">2.0</td><td class="green-txt">97.0%</td><td class="red-txt">2.9%</td><td class="red-txt">0.1%</td><td class="">4.4</td><td class="">3.0%</td><td class="">97.0%</td><td class="">0</td></tr>
+      <tr class=""><td class="">18</td><td class="">Chennai</td><td class="">CHN_Ponniammanmedu_ANow_TCF3</td><td class="">73</td><td class="">12.0</td><td class="">0.40</td><td class="">2.23</td><td class="">1.7</td><td class="">18.0</td><td class="">1.4</td><td class="green-txt">97.3%</td><td class="red-txt">2.7%</td><td class="red-txt">0.0%</td><td class="">8.9</td><td class="">2.7%</td><td class="">97.3%</td><td class="">1</td></tr>
+      <tr class=""><td class="">19</td><td class="">Mumbai</td><td class="">MUM_AmbernarthWest_ANow_TMQ1</td><td class="">101</td><td class="">7.0</td><td class="">0.80</td><td class="">2.37</td><td class="">1.7</td><td class="">24.0</td><td class="">1.8</td><td class="green-txt">86.1%</td><td class="red-txt">2.6%</td><td class="red-txt">11.3%</td><td class="">9.2</td><td class="">13.9%</td><td class="">92.1%</td><td class="">8</td></tr>
+      <tr class=""><td class="">20</td><td class="">Bengaluru</td><td class="">BLR_AttibeleHobli_ANow_TBV1</td><td class="">108</td><td class="">10.0</td><td class="">0.33</td><td class="">2.85</td><td class="">2.3</td><td class="">20.1</td><td class="">1.4</td><td class="green-txt">97.2%</td><td class="red-txt">2.6%</td><td class="red-txt">0.2%</td><td class="">8.7</td><td class="">2.8%</td><td class="">97.2%</td><td class="">2</td></tr>
+      <tr class=""><td class="">21</td><td class="">Delhi</td><td class="">NCR_AmritVihar_ANow_TDM7</td><td class="">76</td><td class="">11.0</td><td class="">0.42</td><td class="">2.04</td><td class="">1.7</td><td class="">18.0</td><td class="">1.2</td><td class="green-txt">97.4%</td><td class="red-txt">2.4%</td><td class="red-txt">0.2%</td><td class="">7.4</td><td class="">2.6%</td><td class="">100.0%</td><td class="">0</td></tr>
+      <tr class=""><td class="">22</td><td class="">Meerut</td><td class="">NCR_GangaNagar_ANow_TZB9</td><td class="">56</td><td class="">5.0</td><td class="">0.10</td><td class="">3.76</td><td class="">2.9</td><td class="">14.8</td><td class="">1.5</td><td class="green-txt">96.4%</td><td class="red-txt">2.3%</td><td class="red-txt">1.3%</td><td class="">5.8</td><td class="">3.6%</td><td class="">98.2%</td><td class="">0</td></tr>
+      <tr class=""><td class="">23</td><td class="">Mumbai</td><td class="">MUM_Siddarthnagar_ANow_TMR1</td><td class="">49</td><td class="">6.0</td><td class="">0.20</td><td class="">2.93</td><td class="">2.3</td><td class="">18.6</td><td class="">1.2</td><td class="green-txt">98.0%</td><td class="red-txt">1.9%</td><td class="red-txt">0.2%</td><td class="">6.7</td><td class="">2.0%</td><td class="">89.8%</td><td class="">4</td></tr>
+      <tr class=""><td class="">24</td><td class="">Delhi</td><td class="">NCR_Burati_ANow_TDD1</td><td class="">40</td><td class="">8.0</td><td class="">0.10</td><td class="">1.95</td><td class="">1.6</td><td class="">25.0</td><td class="">1.8</td><td class="green-txt">95.0%</td><td class="red-txt">1.8%</td><td class="red-txt">3.3%</td><td class="">11.2</td><td class="">2.5%</td><td class="">92.5%</td><td class="">2</td></tr>
+      <tr class=""><td class="">25</td><td class="">Faridabad</td><td class="">NCR_NITRailwayRoad_ANow_TFA8</td><td class="">57</td><td class="">9.0</td><td class="">0.70</td><td class="">2.82</td><td class="">1.9</td><td class="">16.1</td><td class="">1.3</td><td class="green-txt">98.2%</td><td class="red-txt">1.5%</td><td class="red-txt">0.2%</td><td class="">7.4</td><td class="">0.0%</td><td class="">96.5%</td><td class="">1</td></tr>
+      <tr class=""><td class="">26</td><td class="">Delhi</td><td class="">NCR_Rithala_ANow_TDM6</td><td class="">20</td><td class="">4.0</td><td class="">0.40</td><td class="">2.79</td><td class="">2.2</td><td class="">45.1</td><td class="">0.8</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">35.1</td><td class="">0.0%</td><td class="">100.0%</td><td class="">0</td></tr>
+      <tr class=""><td class="">27</td><td class="">Delhi</td><td class="">NCR_PremNagar_ANow_TDM1</td><td class="">40</td><td class="">5.0</td><td class="">0.12</td><td class="">2.20</td><td class="">1.6</td><td class="">16.7</td><td class="">1.1</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">6.6</td><td class="">0.0%</td><td class="">100.0%</td><td class="">0</td></tr>
+      <tr class=""><td class="">28</td><td class="">Lucknow</td><td class="">LKO_Vrindavan_ANow_TLB4</td><td class="">81</td><td class="">9.0</td><td class="">0.20</td><td class="">1.92</td><td class="">1.6</td><td class="">24.5</td><td class="">2.4</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">11.9</td><td class="">0.0%</td><td class="">98.8%</td><td class="">0</td></tr>
+      <tr class=""><td class="">29</td><td class="">Kolkata</td><td class="">KOL_NorthPargana_ANow_TKD4</td><td class="">51</td><td class="">7.0</td><td class="">0.40</td><td class="">1.97</td><td class="">1.7</td><td class="">23.3</td><td class="">2.2</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">10.0</td><td class="">0.0%</td><td class="">94.1%</td><td class="">0</td></tr>
+      <tr class=""><td class="">30</td><td class="">Meerut</td><td class="">NCR_Pallavapuram_ANow_TZB3</td><td class="">46</td><td class="">8.0</td><td class="">0.20</td><td class="">2.94</td><td class="">2.2</td><td class="">17.1</td><td class="">2.1</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">7.2</td><td class="">0.0%</td><td class="">100.0%</td><td class="">0</td></tr>
+      <tr class=""><td class="">31</td><td class="">Ahmedabad</td><td class="">AMD_Saibabatemple_ANow_TEA9</td><td class="">58</td><td class="">10.0</td><td class="">0.20</td><td class="">3.12</td><td class="">2.2</td><td class="">21.5</td><td class="">2.4</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">9.2</td><td class="">0.0%</td><td class="">98.3%</td><td class="">0</td></tr>
+      <tr class="total-row"><td class=""></td><td class="">All Cities</td><td class="">Grand Total</td><td class="">1,978</td><td class="">250.0</td><td class="">0.40</td><td class="">2.47</td><td class="">2.0</td><td class="">24.9</td><td class="">2.1</td><td class="green-txt">90.0%</td><td class="red-txt">7.9%</td><td class="red-txt">2.1%</td><td class="">11.0</td><td class="">9.8%</td><td class="">97.1%</td><td class="">34</td></tr>
+      </tbody>
+    </table>
   </div>
-  <button class="btn" id="refreshBtn">Refresh now</button>
-  <button class="btn ghost" id="settingsBtn">⚙</button>
-</div>
 
-<div class="settings" id="settingsPanel">
-  <h4>Data source</h4>
-  <label>Published CSV link (File → Share → Publish to web)</label>
-  <input id="setPubUrl" type="text" placeholder="https://docs.google.com/.../pub?...output=csv">
-  <label>Spreadsheet ID</label>
-  <input id="setSheetId" type="text">
-  <label>Tab (sheet) name</label>
-  <input id="setSheetName" type="text" placeholder="Base Dump">
-  <label>Tab GID (used if name fails)</label>
-  <input id="setGid" type="text" placeholder="e.g. 1549552679">
-  <label>Auto-refresh interval</label>
-  <select id="setInterval">
-    <option value="60">Every 1 minute</option>
-    <option value="120" selected>Every 2 minutes</option>
-    <option value="300">Every 5 minutes</option>
-    <option value="600">Every 10 minutes</option>
-  </select>
-  <button class="apply" id="applySettings">Apply & refresh</button>
-</div>
-
-<div class="wrap">
-  <div id="statusArea"></div>
-  <div id="dash" style="display:none">
-
-    <div class="kpis" id="kpiStrip"></div>
-
-    <div class="filters">
-      <div class="grp"><label>City</label><select id="fCity"><option value="">All</option></select></div>
-      <div class="grp"><label>Date</label><select id="fDate"><option value="">All</option></select></div>
-      <div class="grp"><label>Live</label><select id="fLive"><option value="">All</option><option>Live</option><option>Non-Live</option></select></div>
-      <div class="grp"><label>Store</label><input type="text" id="fStore" placeholder="Search hub…"></div>
-      <span class="chip" id="rowChip">0 orders</span>
-      <span class="chip" id="storeChip">0 stores</span>
-    </div>
-
-    <div class="alerts" id="alerts">
-      <div class="head" id="alertsHead">
-        <span class="tag" id="alertTag">Alerts</span>
-        <span class="cnt" id="alertCnt">—</span>
-        <span style="font-size:12px;color:var(--ink-soft)" id="alertSummary"></span>
-        <span style="margin-left:auto;font-size:12px;color:var(--ink-soft)">▾ expand</span>
-      </div>
-      <div class="body"><div style="overflow:auto;max-height:280px"><table id="alertTable"></table></div></div>
-    </div>
-
-    <div class="section-h"><h2>Journey stage times</h2><span class="hint">median minutes per leg · p90 below</span></div>
-    <div class="funnel" id="funnel"></div>
-
-    <div class="section-h"><h2>Trends & delay attribution</h2><span class="hint">filtered scope</span></div>
-    <div class="charts">
-      <div class="card">
-        <h3>Orders & breach rate by hour</h3><div class="sub">bars = orders · line = breach %</div>
-        <div class="chartbox"><canvas id="hourChart"></canvas></div>
-      </div>
-      <div class="card">
-        <h3>Where time is lost</h3><div class="sub">delay source mix by city (share of orders)</div>
-        <div class="chartbox"><canvas id="delayChart"></canvas></div>
-      </div>
-    </div>
-
-    <div class="section-h"><h2>Store leaderboard</h2><span class="hint">click a column to sort · click a row to drill in</span></div>
-    <div class="tablecard"><div class="tscroll"><table class="stores" id="storeTable"></table></div></div>
-
-    <div class="foot" id="foot"></div>
-  </div>
-</div>
-
-<div class="overlay" id="overlay">
-  <div class="modal">
-    <div class="mh">
-      <div><h3 id="mTitle">Store</h3><div class="mono" id="mSub"></div></div>
-      <button class="btn" id="mClose">Close</button>
-    </div>
-    <div class="mb">
-      <div class="minikpis" id="mKpis"></div>
-      <div class="mgrid">
-        <div class="card"><h3>Delay sources</h3><div class="sub">this store</div><div class="chartbox" style="height:220px"><canvas id="mDelayChart"></canvas></div></div>
-        <div class="card"><h3>Riders needing attention</h3><div class="sub">highest avg delay (min 2 orders)</div><table class="mtable" id="mRiders"></table></div>
-      </div>
-      <div class="card" style="margin-top:12px"><h3>Latest orders</h3><div class="sub">most recent 15 in scope</div>
-        <div style="overflow:auto"><table class="mtable" id="mOrders"></table></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-/* ================= CONFIG ================= */
-const cfg = {
-  publishedUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTJ08wCkUNsrYAecjYB_V4c4AStbWiefDrqpO-KCQHhm3Err_D-erKkPP_r2_tjOBuQzY2f0PsCiq_s/pub?gid=1379095974&single=true&output=csv',
-  sheetId: '1-mI-M4O1XXAAxzV7N5hsWiYfha7V2ZEaf7dySVR4V-k',
-  sheetName: 'Base Dump',
-  gid: '1549552679',
-  intervalSec: 120,
-  ragAmber: 10,   // breach % thresholds
-  ragRed: 20
-};
-
-/* ================= STATE ================= */
-let rawRows = [];          // parsed order objects
-let timerId = null, countLeft = 0, countId = null;
-let charts = {};
-let sortKey = 'orders', sortDir = -1;
-let currentStores = [];
-
-/* ================= HELPERS ================= */
-const $ = id => document.getElementById(id);
-const fmtPct = v => isFinite(v) ? v.toFixed(1) + '%' : '—';
-const fmtN = v => isFinite(v) ? v.toLocaleString('en-IN') : '—';
-const fmtMin = v => isFinite(v) ? (v >= 100 ? Math.round(v) : v.toFixed(1)) : '—';
-
-function parseTs(s){
-  if(!s) return null;
-  s = String(s).trim();
-  // M/D/YYYY H:MM[:SS]  or  M/D/YYYY
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-  if(!m) { const d = new Date(s); return isNaN(d) ? null : d; }
-  return new Date(+m[3], +m[1]-1, +m[2], +(m[4]||0), +(m[5]||0), +(m[6]||0));
-}
-function diffMin(a,b){ return (a && b) ? (b - a)/60000 : NaN; }
-function median(arr){ const a = arr.filter(isFinite).sort((x,y)=>x-y); if(!a.length) return NaN; const h = Math.floor(a.length/2); return a.length%2 ? a[h] : (a[h-1]+a[h])/2; }
-function pctl(arr,p){ const a = arr.filter(isFinite).sort((x,y)=>x-y); if(!a.length) return NaN; return a[Math.min(a.length-1, Math.floor(p/100*a.length))]; }
-function avg(arr){ const a = arr.filter(isFinite); return a.length ? a.reduce((s,v)=>s+v,0)/a.length : NaN; }
-function ragClass(b){ return b >= cfg.ragRed ? 'r' : b >= cfg.ragAmber ? 'a' : 'g'; }
-function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function shortStore(h){ return h ? h.replace(/_ANow.*/,'').replace(/^[A-Z]{3}_/,'') : '(unknown)'; }
-function timeHM(d){ return d ? d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '—'; }
-
-/* ================= FETCH ================= */
-function csvUrls(){
-  const base = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/gviz/tq?tqx=out:csv`;
-  const urls = [];
-  if(cfg.publishedUrl) urls.push(cfg.publishedUrl + '&cachebust=' + Date.now());
-  if(cfg.sheetName) urls.push(base + '&sheet=' + encodeURIComponent(cfg.sheetName));
-  ['Base Dump','BaseDump','basedump','Base dump','base dump'].forEach(n=>{
-    const u = base + '&sheet=' + encodeURIComponent(n);
-    if(!urls.includes(u)) urls.push(u);
-  });
-  if(cfg.gid) urls.push(base + '&gid=' + encodeURIComponent(cfg.gid));
-  return urls;
-}
-
-async function fetchCsv(){
-  let lastErr = null;
-  for(const url of csvUrls()){
-    try{
-      const r = await fetch(url, {cache:'no-store'});
-      if(!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
-      const text = await r.text();
-      if(text.trim().startsWith('<')) { lastErr = new Error('Got HTML instead of CSV (sheet not link-shared?)'); continue; }
-      const parsed = Papa.parse(text, {header:true, skipEmptyLines:true, transformHeader: h=>h.trim()});
-      if(parsed.data && parsed.data.length > 1 && parsed.meta.fields.some(f=>/hub_name/i.test(f))) return parsed;
-      lastErr = new Error('Parsed but no Hub_name column — wrong tab?');
-    }catch(e){ lastErr = e; }
-  }
-  throw lastErr || new Error('No data source reachable');
-}
-
-/* ================= NORMALIZE ================= */
-function normalize(parsed){
-  const F = {};
-  parsed.meta.fields.forEach(f=>{ F[f.toLowerCase().replace(/[^a-z0-9]/g,'')] = f; });
-  const g = (row, key) => { const f = F[key]; return f ? row[f] : undefined; };
-
-  return parsed.data.map(row=>{
-    const creation = parseTs(g(row,'creationtime'));
-    const accept   = parseTs(g(row,'accepttime'));
-    const packed   = parseTs(g(row,'bagspackedreadyforpickup'));
-    const picked   = parseTs(g(row,'pickedtime'));
-    const doorstep = parseTs(g(row,'cxdoorsteptime'));
-    const delivered= parseTs(g(row,'deliverytime'));
-    const promised = parseTs(g(row,'customerpromiseddeliverytime'));
-    const rtsStart = parseTs(g(row,'rtsstarttime'));
-    const status   = String(g(row,'currentorderstatus')||'').trim().toUpperCase();
-    const hub      = String(g(row,'hubname')||'').trim();
-    if(!hub && !status) return null;
-
-    const isDelivered = status === 'DELIVERED';
-    const isRts = status.startsWith('RTS') || !!rtsStart;
-    const isPending = !isDelivered && !isRts;
-    const delayVsPromise = (delivered && promised) ? diffMin(promised, delivered) : NaN;
-    const onTime = isDelivered && isFinite(delayVsPromise) ? delayVsPromise <= 0 : null;
-
-    let hour = parseInt(g(row,'hour'));
-    if(!isFinite(hour) && creation) hour = creation.getHours();
-
-    return {
-      awb: g(row,'awbnumber'), hub, store: shortStore(hub),
-      city: String(g(row,'cityname')||'').trim() || '(unknown)',
-      status, isDelivered, isRts, isPending,
-      rider: String(g(row,'name')||'').trim().replace(/\s*\.\s*$/,''),
-      riderId: g(row,'riderid'),
-      date: String(g(row,'creationdate')||'').trim(),
-      hour, creation, accept, packed, picked, doorstep, delivered, promised,
-      live: String(g(row,'livenonlive')||'').trim(),
-      delaySource: String(g(row,'delaysource')||'').trim() || 'Unattributed',
-      delayVsPromise, onTime,
-      c2a: diffMin(creation, accept),
-      a2pack: diffMin(accept, packed),
-      pack2pick: diffMin(packed, picked),
-      lm: diffMin(picked, doorstep),
-      handover: diffMin(doorstep, delivered)
-    };
-  }).filter(Boolean);
-}
-
-/* ================= FILTERING ================= */
-function filtered(){
-  const c = $('fCity').value, d = $('fDate').value, l = $('fLive').value, s = $('fStore').value.trim().toLowerCase();
-  return rawRows.filter(r =>
-    (!c || r.city === c) && (!d || r.date === d) && (!l || r.live === l) &&
-    (!s || r.hub.toLowerCase().includes(s) || r.store.toLowerCase().includes(s))
-  );
-}
-
-/* ================= AGGREGATION ================= */
-function aggStores(rows){
-  const map = new Map();
-  rows.forEach(r=>{
-    if(!map.has(r.hub)) map.set(r.hub, {hub:r.hub, store:r.store, city:r.city, rows:[]});
-    map.get(r.hub).rows.push(r);
-  });
-  return [...map.values()].map(s=>{
-    const del = s.rows.filter(r=>r.isDelivered);
-    const judged = del.filter(r=>r.onTime !== null);
-    const breaches = judged.filter(r=>!r.onTime).length;
-    return {
-      hub:s.hub, store:s.store, city:s.city, rows:s.rows,
-      orders: s.rows.length,
-      delivered: del.length,
-      pending: s.rows.filter(r=>r.isPending).length,
-      rts: s.rows.filter(r=>r.isRts).length,
-      rtsPct: s.rows.length ? s.rows.filter(r=>r.isRts).length/s.rows.length*100 : NaN,
-      otd: judged.length ? (judged.length-breaches)/judged.length*100 : NaN,
-      breachPct: judged.length ? breaches/judged.length*100 : NaN,
-      breaches,
-      avgDelay: avg(judged.map(r=>Math.max(0,r.delayVsPromise))),
-      c2a: median(s.rows.map(r=>r.c2a)),
-      pack2pick: median(s.rows.map(r=>r.pack2pick)),
-      lm: median(s.rows.map(r=>r.lm))
-    };
-  });
-}
-
-/* ================= RENDER: KPIs ================= */
-function renderKpis(rows){
-  const del = rows.filter(r=>r.isDelivered);
-  const judged = del.filter(r=>r.onTime !== null);
-  const breaches = judged.filter(r=>!r.onTime).length;
-  const otd = judged.length ? (judged.length-breaches)/judged.length*100 : NaN;
-  const bp = judged.length ? breaches/judged.length*100 : NaN;
-  const avgD = avg(judged.filter(r=>!r.onTime).map(r=>r.delayVsPromise));
-  const rts = rows.filter(r=>r.isRts).length;
-  const pending = rows.filter(r=>r.isPending).length;
-  const stores = new Set(rows.map(r=>r.hub)).size;
-  const liveOrders = rows.filter(r=>r.live==='Live').length;
-
-  const tiles = [
-    {k:'Orders', v:fmtN(rows.length), d:`${fmtN(liveOrders)} live-store`, cls:''},
-    {k:'Delivered', v:fmtN(del.length), d:`${fmtN(pending)} still open`, cls:''},
-    {k:'On-time %', v:fmtPct(otd), d:'vs promised time', cls: isFinite(otd) ? (otd>=90?'good':otd>=80?'warn':'bad') : ''},
-    {k:'Breach %', v:fmtPct(bp), d:`${fmtN(breaches)} breached`, cls: isFinite(bp)?ragClass(bp)==='g'?'good':ragClass(bp)==='a'?'warn':'bad':''},
-    {k:'Avg delay (breached)', v:fmtMin(avgD)+'m', d:'past promise', cls:''},
-    {k:'RTS orders', v:fmtN(rts), d:fmtPct(rows.length?rts/rows.length*100:NaN)+' of orders', cls: rts/Math.max(rows.length,1)*100 > 3 ? 'warn':''},
-    {k:'Active stores', v:fmtN(stores), d:'in scope', cls:''}
-  ];
-  $('kpiStrip').innerHTML = tiles.map(t=>
-    `<div class="kpi ${t.cls}"><div class="edge"></div><div class="k">${t.k}</div><div class="v">${t.v}</div><div class="d">${t.d}</div></div>`).join('');
-}
-
-/* ================= RENDER: ALERTS ================= */
-function renderAlerts(rows, stores){
-  const now = new Date();
-  const breaching = rows.filter(r=>r.isPending && r.promised && now > r.promised)
-                        .sort((a,b)=>a.promised-b.promised).slice(0,60);
-  const redStores = stores.filter(s=>ragClass(s.breachPct)==='r' && s.orders>=10);
-  const total = breaching.length + redStores.length;
-  const box = $('alerts');
-  box.classList.toggle('ok', total===0);
-  $('alertTag').textContent = total===0 ? 'All clear' : 'Alerts';
-  $('alertCnt').textContent = total===0 ? '' : total;
-  $('alertSummary').textContent = total===0
-    ? 'No open orders past promise · no stores in red'
-    : `${breaching.length} open orders past promised time · ${redStores.length} stores in red zone`;
-
-  let html = '';
-  if(breaching.length){
-    html += `<tr><th>AWB</th><th>Store</th><th>City</th><th>Status</th><th>Promised</th><th>Overdue by</th></tr>`;
-    html += breaching.map(r=>{
-      const od = diffMin(r.promised, now);
-      return `<tr><td class="mono">${esc(r.awb)}</td><td>${esc(r.store)}</td><td>${esc(r.city)}</td><td class="mono">${esc(r.status)}</td><td class="mono">${timeHM(r.promised)}</td><td class="mono" style="color:var(--red);font-weight:600">${fmtMin(od)}m</td></tr>`;
-    }).join('');
-  }
-  if(redStores.length){
-    html += `<tr><th colspan="6" style="padding-top:12px">Stores over ${cfg.ragRed}% breach</th></tr>`;
-    html += redStores.map(s=>`<tr><td colspan="3">${esc(s.store)} · ${esc(s.city)}</td><td class="mono" colspan="2">${fmtN(s.orders)} orders</td><td class="mono" style="color:var(--red);font-weight:600">${fmtPct(s.breachPct)}</td></tr>`).join('');
-  }
-  $('alertTable').innerHTML = html || '<tr><td style="padding:14px;color:var(--ink-soft)">Nothing to flag right now.</td></tr>';
-}
-
-/* ================= RENDER: FUNNEL ================= */
-function renderFunnel(rows){
-  const stages = [
-    ['Create → Accept', rows.map(r=>r.c2a)],
-    ['Accept → Packed', rows.map(r=>r.a2pack)],
-    ['Packed → Picked', rows.map(r=>r.pack2pick)],
-    ['Picked → Doorstep', rows.map(r=>r.lm)],
-    ['Doorstep → Done', rows.map(r=>r.handover)]
-  ];
-  $('funnel').innerHTML = stages.map(([n,a])=>{
-    const m = median(a), p = pctl(a,90);
-    return `<div class="stage"><div class="n">${n}</div><div class="m">${fmtMin(m)}<span> min</span></div><div class="p90">p90 ${fmtMin(p)}m</div></div>`;
-  }).join('');
-}
-
-/* ================= RENDER: CHARTS ================= */
-const COLORS = {'On Time':'#0E8A4C','LM Delay':'#C6373C','Pickup Delay':'#C77D0A','Creation to Accept Delay':'#0F5257','Unattributed':'#9AA6A0'};
-function colorFor(src,i){ return COLORS[src] || ['#6B4E9B','#2E7DAF','#B0578D','#7A6A2F'][i%4]; }
-
-function chartsAvailable(){ return typeof Chart !== 'undefined'; }
-function chartUnavailableMsg(canvasId){
-  const box = $(canvasId).parentElement;
-  box.innerHTML = '<div class="skel">Chart library couldn\'t load on this network — data below is unaffected. Try a hard refresh (Ctrl+Shift+R).</div>';
-}
-function renderCharts(rows){
-  if(!chartsAvailable()){ chartUnavailableMsg('hourChart'); chartUnavailableMsg('delayChart'); return; }
-  // hourly
-  const hours = [...Array(24).keys()];
-  const byHour = hours.map(h=>rows.filter(r=>r.hour===h));
-  const vol = byHour.map(a=>a.length);
-  const bp = byHour.map(a=>{
-    const j = a.filter(r=>r.onTime!==null);
-    return j.length ? j.filter(r=>!r.onTime).length/j.length*100 : null;
-  });
-  if(charts.hour) charts.hour.destroy();
-  charts.hour = new Chart($('hourChart'), {
-    data:{labels:hours.map(h=>String(h).padStart(2,'0')),
-      datasets:[
-        {type:'bar',label:'Orders',data:vol,backgroundColor:'#0F5257',borderRadius:3,yAxisID:'y'},
-        {type:'line',label:'Breach %',data:bp,borderColor:'#C6373C',backgroundColor:'#C6373C',tension:.3,pointRadius:2.5,yAxisID:'y1',spanGaps:true}
-      ]},
-    options:{maintainAspectRatio:false,scales:{
-      y:{beginAtZero:true,grid:{color:'#EAEEEA'}},
-      y1:{beginAtZero:true,position:'right',grid:{display:false},ticks:{callback:v=>v+'%'}},
-      x:{grid:{display:false}}},
-      plugins:{legend:{labels:{boxWidth:12,font:{family:'Archivo',size:11}}}}}
-  });
-
-  // delay source by city
-  const cities = [...new Set(rows.map(r=>r.city))].sort((a,b)=>rows.filter(r=>r.city===b).length - rows.filter(r=>r.city===a).length).slice(0,10);
-  const sources = [...new Set(rows.map(r=>r.delaySource))].sort((a,b)=>(a==='On Time'?-1:b==='On Time'?1:0));
-  const ds = sources.map((src,i)=>({
-    label:src,
-    data:cities.map(c=>{
-      const cr = rows.filter(r=>r.city===c);
-      return cr.length ? cr.filter(r=>r.delaySource===src).length/cr.length*100 : 0;
-    }),
-    backgroundColor:colorFor(src,i),
-    borderRadius:2
-  }));
-  if(charts.delay) charts.delay.destroy();
-  charts.delay = new Chart($('delayChart'), {
-    type:'bar',
-    data:{labels:cities,datasets:ds},
-    options:{maintainAspectRatio:false,indexAxis:'y',
-      scales:{x:{stacked:true,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#EAEEEA'}},y:{stacked:true,grid:{display:false}}},
-      plugins:{legend:{labels:{boxWidth:12,font:{family:'Archivo',size:11}}},
-        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.x.toFixed(1)}%`}}}}
-  });
-}
-
-/* ================= RENDER: STORE TABLE ================= */
-const COLS = [
-  {key:'store', label:'Store', num:false},
-  {key:'city', label:'City', num:false},
-  {key:'orders', label:'Orders', num:true},
-  {key:'delivered', label:'Delivered', num:true},
-  {key:'pending', label:'Open', num:true},
-  {key:'otd', label:'OTD %', num:true},
-  {key:'breachPct', label:'Breach %', num:true},
-  {key:'avgDelay', label:'Avg delay', num:true},
-  {key:'c2a', label:'C→A med', num:true},
-  {key:'pack2pick', label:'Pack→Pick', num:true},
-  {key:'lm', label:'LM med', num:true},
-  {key:'rtsPct', label:'RTS %', num:true}
-];
-function renderStores(stores){
-  currentStores = stores;
-  const sorted = [...stores].sort((a,b)=>{
-    let av=a[sortKey], bv=b[sortKey];
-    if(typeof av === 'string') return sortDir * av.localeCompare(bv);
-    av = isFinite(av)?av:-Infinity; bv = isFinite(bv)?bv:-Infinity;
-    return sortDir * (av - bv);
-  });
-  const head = '<tr>' + COLS.map(c=>`<th data-k="${c.key}">${c.label}${sortKey===c.key?` <span class="arr">${sortDir<0?'▼':'▲'}</span>`:''}</th>`).join('') + '</tr>';
-  const body = sorted.map((s,i)=>{
-    const rc = isFinite(s.breachPct) ? ragClass(s.breachPct) : 'g';
-    return `<tr data-hub="${esc(s.hub)}">
-      <td class="store"><span class="rag ${rc}"></span>${esc(s.store)}</td>
-      <td class="city">${esc(s.city)}</td>
-      <td>${fmtN(s.orders)}</td><td>${fmtN(s.delivered)}</td>
-      <td>${s.pending ? `<span class="pill a">${s.pending}</span>` : '0'}</td>
-      <td>${fmtPct(s.otd)}</td>
-      <td><span class="pill ${rc}">${fmtPct(s.breachPct)}</span><span class="heat ${rc}"><i style="width:${Math.min(100, (s.breachPct||0)*2.5)}%"></i></span></td>
-      <td>${fmtMin(s.avgDelay)}m</td><td>${fmtMin(s.c2a)}m</td><td>${fmtMin(s.pack2pick)}m</td><td>${fmtMin(s.lm)}m</td>
-      <td>${fmtPct(s.rtsPct)}</td></tr>`;
-  }).join('');
-  $('storeTable').innerHTML = head + body;
-  $('storeTable').querySelectorAll('th').forEach(th=>th.onclick = ()=>{
-    const k = th.dataset.k;
-    if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=-1; }
-    renderStores(currentStores);
-  });
-  $('storeTable').querySelectorAll('tbody tr, tr[data-hub]').forEach(tr=>{
-    if(tr.dataset.hub) tr.onclick = ()=>openStore(tr.dataset.hub);
-  });
-}
-
-/* ================= DRILL-DOWN ================= */
-function openStore(hub){
-  const s = currentStores.find(x=>x.hub===hub);
-  if(!s) return;
-  $('mTitle').textContent = s.store + ' · ' + s.city;
-  $('mSub').textContent = s.hub;
-  const rc = isFinite(s.breachPct)?ragClass(s.breachPct):'g';
-  const tiles = [
-    ['Orders', fmtN(s.orders), ''],
-    ['OTD %', fmtPct(s.otd), rc==='g'?'good':rc==='a'?'warn':'bad'],
-    ['Breach %', fmtPct(s.breachPct), rc==='g'?'good':rc==='a'?'warn':'bad'],
-    ['Open orders', fmtN(s.pending), s.pending?'warn':''],
-    ['RTS %', fmtPct(s.rtsPct), ''],
-    ['C→A med', fmtMin(s.c2a)+'m', ''],
-    ['Pack→Pick', fmtMin(s.pack2pick)+'m', ''],
-    ['LM med', fmtMin(s.lm)+'m', '']
-  ];
-  $('mKpis').innerHTML = tiles.map(([k,v,c])=>`<div class="kpi ${c}"><div class="edge"></div><div class="k">${k}</div><div class="v" style="font-size:20px">${v}</div></div>`).join('');
-
-  // delay doughnut
-  const counts = {};
-  s.rows.forEach(r=>counts[r.delaySource]=(counts[r.delaySource]||0)+1);
-  const labels = Object.keys(counts);
-  if(chartsAvailable()){
-  if(charts.mDelay) charts.mDelay.destroy();
-  charts.mDelay = new Chart($('mDelayChart'), {
-    type:'doughnut',
-    data:{labels, datasets:[{data:labels.map(l=>counts[l]), backgroundColor:labels.map((l,i)=>colorFor(l,i)), borderWidth:2, borderColor:'#fff'}]},
-    options:{maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:12,font:{family:'Archivo',size:11}}}}}
-  });
-  } else { chartUnavailableMsg('mDelayChart'); }
-
-  // riders
-  const rmap = new Map();
-  s.rows.forEach(r=>{
-    if(!r.rider) return;
-    if(!rmap.has(r.rider)) rmap.set(r.rider,{n:r.rider,orders:0,delays:[]});
-    const e = rmap.get(r.rider); e.orders++;
-    if(r.onTime===false) e.delays.push(r.delayVsPromise);
-  });
-  const riders = [...rmap.values()].filter(r=>r.orders>=2)
-    .map(r=>({...r, avgD: avg(r.delays), br: r.delays.length/r.orders*100}))
-    .sort((a,b)=>(isFinite(b.avgD)?b.avgD:-1)-(isFinite(a.avgD)?a.avgD:-1)).slice(0,8);
-  $('mRiders').innerHTML = '<tr><th>Rider</th><th>Orders</th><th>Breach %</th><th>Avg delay</th></tr>' +
-    (riders.length ? riders.map(r=>`<tr><td>${esc(r.n)}</td><td class="mono">${r.orders}</td><td class="mono">${fmtPct(r.br)}</td><td class="mono">${isFinite(r.avgD)?fmtMin(r.avgD)+'m':'—'}</td></tr>`).join('')
-    : '<tr><td colspan="4" style="color:var(--ink-soft)">Not enough rider data.</td></tr>');
-
-  // orders
-  const latest = [...s.rows].sort((a,b)=>(b.creation||0)-(a.creation||0)).slice(0,15);
-  $('mOrders').innerHTML = '<tr><th>AWB</th><th>Status</th><th>Created</th><th>Promised</th><th>Delivered</th><th>Δ vs promise</th><th>Source</th></tr>' +
-    latest.map(r=>{
-      const d = r.delayVsPromise;
-      const col = !isFinite(d) ? '' : d<=0 ? 'color:var(--green)' : 'color:var(--red);font-weight:600';
-      return `<tr><td class="mono">${esc(r.awb)}</td><td class="mono">${esc(r.status)}</td><td class="mono">${timeHM(r.creation)}</td><td class="mono">${timeHM(r.promised)}</td><td class="mono">${timeHM(r.delivered)}</td><td class="mono" style="${col}">${isFinite(d)?(d>0?'+':'')+fmtMin(d)+'m':'—'}</td><td>${esc(r.delaySource)}</td></tr>`;
-    }).join('');
-
-  $('overlay').classList.add('open');
-}
-$('mClose').onclick = ()=>$('overlay').classList.remove('open');
-$('overlay').onclick = e=>{ if(e.target===$('overlay')) $('overlay').classList.remove('open'); };
-
-/* ================= FILTER OPTIONS ================= */
-function refreshFilterOptions(){
-  const keep = (sel)=>sel.value;
-  const cities = [...new Set(rawRows.map(r=>r.city))].sort();
-  const dates = [...new Set(rawRows.map(r=>r.date))].filter(Boolean)
-    .sort((a,b)=>parseTs(b)-parseTs(a));
-  const fill = (sel, arr)=>{
-    const cur = keep(sel);
-    sel.innerHTML = '<option value="">All</option>' + arr.map(v=>`<option${v===cur?' selected':''}>${esc(v)}</option>`).join('');
-  };
-  fill($('fCity'), cities);
-  fill($('fDate'), dates);
-}
-
-/* ================= MASTER RENDER ================= */
-function renderAll(){
-  const rows = filtered();
-  const stores = aggStores(rows);
-  $('rowChip').textContent = fmtN(rows.length) + ' orders';
-  $('storeChip').textContent = fmtN(stores.length) + ' stores';
-  const safe = (fn, name) => { try { fn(); } catch(e){ console.error('Section failed:', name, e); } };
-  safe(()=>renderKpis(rows), 'kpis');
-  safe(()=>renderAlerts(rows, stores), 'alerts');
-  safe(()=>renderFunnel(rows), 'funnel');
-  safe(()=>renderCharts(rows), 'charts');
-  safe(()=>renderStores(stores), 'stores');
-  $('foot').textContent = `source: Google Sheet · tab "${cfg.sheetName}" · ${fmtN(rawRows.length)} total rows loaded · auto-refresh every ${cfg.intervalSec/60} min`;
-}
-
-/* ================= REFRESH LOOP ================= */
-function setStatus(ok, msg){
-  $('pulse').classList.toggle('err', !ok);
-  if(ok) $('lastSync').textContent = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-}
-function showError(e){
-  $('dash').style.display = rawRows.length ? '' : 'none';
-  $('statusArea').innerHTML = `
-    <div class="notice">
-      <h3>Couldn't reach the sheet</h3>
-      <p><code>${esc(e.message || e)}</code></p>
-      <p>For the live feed to work, this page must be able to read the Google Sheet directly. Check these:</p>
-      <ol>
-        <li>In Google Sheets: <b>Share → General access → Anyone with the link → Viewer</b>. The dashboard reads data only; nobody can edit.</li>
-        <li>The tab name should be <b>Base Dump</b> — if yours is named differently, set it in ⚙ settings (top right), or paste the tab's <b>gid</b> from its URL.</li>
-        <li>If you're viewing this inside Claude's preview, the sandbox blocks outside connections — <b>download this file and open it in Chrome/Edge</b>, or host it on your intranet. It will then fetch live data and refresh automatically.</li>
-      </ol>
-    </div>`;
-}
-async function refresh(){
-  $('refreshBtn').textContent = 'Syncing…';
-  try{
-    const parsed = await fetchCsv();
-    rawRows = normalize(parsed);
-    $('statusArea').innerHTML = '';
-    $('dash').style.display = '';
-    refreshFilterOptions();
-    renderAll();
-    setStatus(true);
-  }catch(e){
-    console.error(e);
-    setStatus(false);
-    showError(e);
-  }finally{
-    $('refreshBtn').textContent = 'Refresh now';
-    startCountdown();
-  }
-}
-function startCountdown(){
-  clearInterval(countId);
-  countLeft = cfg.intervalSec;
-  const circ = 62.8;
-  countId = setInterval(()=>{
-    countLeft--;
-    $('countdown').textContent = `${String(Math.floor(countLeft/60)).padStart(1,'0')}:${String(countLeft%60).padStart(2,'0')}`;
-    $('ringFg').style.strokeDashoffset = circ * (1 - countLeft/cfg.intervalSec);
-    if(countLeft<=0){ clearInterval(countId); refresh(); }
-  },1000);
-  $('countdown').textContent = `${Math.floor(countLeft/60)}:${String(countLeft%60).padStart(2,'0')}`;
-}
-
-/* ================= EVENTS ================= */
-['fCity','fDate','fLive'].forEach(id=>$(id).onchange = renderAll);
-$('fStore').oninput = renderAll;
-$('refreshBtn').onclick = refresh;
-$('alertsHead').onclick = ()=>$('alerts').classList.toggle('open');
-$('settingsBtn').onclick = ()=>{
-  $('setPubUrl').value = cfg.publishedUrl;
-  $('setSheetId').value = cfg.sheetId;
-  $('setSheetName').value = cfg.sheetName;
-  $('setGid').value = cfg.gid;
-  $('setInterval').value = String(cfg.intervalSec);
-  $('settingsPanel').classList.toggle('open');
-};
-$('applySettings').onclick = ()=>{
-  cfg.publishedUrl = $('setPubUrl').value.trim();
-  cfg.sheetId = $('setSheetId').value.trim() || cfg.sheetId;
-  cfg.sheetName = $('setSheetName').value.trim();
-  cfg.gid = $('setGid').value.trim();
-  cfg.intervalSec = parseInt($('setInterval').value) || 120;
-  $('settingsPanel').classList.remove('open');
-  refresh();
-};
-
-/* ================= BOOT ================= */
-if(chartsAvailable()){
-  Chart.defaults.font.family = "'IBM Plex Mono', monospace";
-  Chart.defaults.font.size = 10.5;
-  Chart.defaults.color = '#4E5B54';
-}
-refresh();
-</script>
 </body>
 </html>
