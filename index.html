@@ -33,6 +33,8 @@
     <div class="kpi-card"><p class="kpi-label">SLA breach %</p><p class="kpi-value danger" id="kpiBreach">–</p></div>
     <div class="kpi-card"><p class="kpi-label">Avg accept gap</p><p class="kpi-value" id="kpiAccept">–</p></div>
     <div class="kpi-card"><p class="kpi-label">Avg reach→intent</p><p class="kpi-value" id="kpiIntent">–</p></div>
+    <div class="kpi-card"><p class="kpi-label">Rider delay %</p><p class="kpi-value danger" id="kpiRiderDelay">–</p></div>
+    <div class="kpi-card"><p class="kpi-label">Store delay %</p><p class="kpi-value danger" id="kpiStoreDelay">–</p></div>
     <div class="kpi-card"><p class="kpi-label">Active riders today</p><p class="kpi-value" id="kpiRiders">–</p></div>
     <div class="kpi-card"><p class="kpi-label">Avg login hours</p><p class="kpi-value" id="kpiLoginHrs">–</p></div>
   </section>
@@ -55,6 +57,28 @@
         <thead>
           <tr><th>Hub</th><th>City</th><th>Orders</th><th>Avg accept gap</th><th>Breach %</th></tr>
         </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <p class="card-title">Top 15 worst-performing stores overall</p>
+    <p class="card-subtitle">Ranked by breach %, min 15 orders</p>
+    <div class="table-wrap">
+      <table id="worstStoresTable">
+        <thead><tr><th>Hub</th><th>City</th><th>Orders</th><th>Breach %</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <p class="card-title">Top 5 worst-performing stores per city</p>
+    <p class="card-subtitle">Ranked by breach %, min 15 orders</p>
+    <div class="table-wrap">
+      <table id="worstStoresByCityTable">
+        <thead><tr><th>Hub</th><th>City</th><th>Orders</th><th>Breach %</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
