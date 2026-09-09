@@ -35,6 +35,7 @@ const R = {
 
 let currentCity = "";
 let currentLive = "";
+let riderLoginCache = null; // reset each refresh so login hours stay current
 
 /* ---------- gviz fetch helper (JSONP, works from a static page) ---------- */
 function gvizQuery(gid, query) {
@@ -54,7 +55,8 @@ function gvizQuery(gid, query) {
     window[cb] = (resp) => {
       cleanup();
       if (resp.status === "error") {
-        reject(new Error(resp.errors?.[0]?.detailed_message || "Query error"));
+        const msg = resp.errors?.[0]?.detailed_message || resp.errors?.[0]?.message || "Query error";
+        reject(new Error(msg + " | query: " + query));
         return;
       }
       resolve(resp.table);
@@ -94,6 +96,7 @@ const fmtNum = (n, d = 2) => (n == null ? "–" : Number(n).toFixed(d));
    ============================================================ */
 async function loadDashboard() {
   setStatus("Refreshing…");
+  riderLoginCache = null;
   try {
     await Promise.all([loadCityFilter(), loadKpis(), loadHourly(), loadDelaySplit(), loadHubTable(), loadRiderTable()]);
     setStatus("Updated " + new Date().toLocaleTimeString());
@@ -234,13 +237,15 @@ async function loadRiderTable() {
   const orderTable = await gvizQuery(ORDERS_GID, orderQ);
   const orderRows = tableRows(orderTable);
 
-  const riderIds = orderRows.map(r => r[0]).filter(Boolean);
-  let loginMap = new Map();
-  if (riderIds.length) {
-    const idList = riderIds.map(id => `${R.riderId} = '${id}'`).join(" OR ");
-    const loginQ = `SELECT ${R.riderId}, SUM(${R.loginHours}) WHERE ${idList} GROUP BY ${R.riderId}`;
+  // Pull login hours for ALL riders in one grouped query (fast) rather than
+  // building a long OR-list per rider (was timing out on large sheets).
+  let loginMap = riderLoginCache;
+  if (!loginMap) {
+    const loginQ = `SELECT ${R.riderId}, SUM(${R.loginHours}) GROUP BY ${R.riderId}`;
     const loginTable = await gvizQuery(RIDER_GID, loginQ);
+    loginMap = new Map();
     tableRows(loginTable).forEach(([id, hrs]) => loginMap.set(String(id), hrs));
+    riderLoginCache = loginMap;
   }
 
   const tbody = document.querySelector("#riderTable tbody");
