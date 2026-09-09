@@ -44,7 +44,7 @@ function gvizQuery(gid, query) {
     const timeout = setTimeout(() => {
       cleanup();
       reject(new Error("Sheet query timed out — check that link sharing is on."));
-    }, 20000);
+    }, 45000);
 
     function cleanup() {
       clearTimeout(timeout);
@@ -98,7 +98,17 @@ async function loadDashboard() {
   setStatus("Refreshing…");
   riderLoginCache = null;
   try {
-    await Promise.all([loadCityFilter(), loadKpis(), loadHourly(), loadDelaySplit(), loadHubTable(), loadRiderTable()]);
+    await loadCityFilter();
+    setStatus("Loading KPIs…");
+    await loadKpis();
+    setStatus("Loading hourly trend…");
+    await loadHourly();
+    setStatus("Loading delay split…");
+    await loadDelaySplit();
+    setStatus("Loading hub table…");
+    await loadHubTable();
+    setStatus("Loading rider table…");
+    await loadRiderTable();
     setStatus("Updated " + new Date().toLocaleTimeString());
   } catch (err) {
     console.error(err);
