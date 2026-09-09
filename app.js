@@ -107,6 +107,8 @@ async function loadDashboard() {
     await loadDelaySplit();
     setStatus("Loading hub table…");
     await loadHubTable();
+    setStatus("Loading worst-performing stores…");
+    await loadWorstStores();
     setStatus("Loading rider table…");
     await loadRiderTable();
     setStatus("Updated " + new Date().toLocaleTimeString());
@@ -150,6 +152,17 @@ async function loadKpis() {
   document.getElementById("kpiBreach").textContent = total ? fmtPct(breachCount / total) : "–";
   document.getElementById("kpiAccept").textContent = avgAccept != null ? fmtNum(avgAccept) : "–";
   document.getElementById("kpiIntent").textContent = avgIntent != null ? fmtNum(avgIntent) : "–";
+
+  // Rider-caused vs store-caused breach split.
+  // ASSUMPTION (please confirm): a breached order is "rider delay" when the
+  // Delay column = 'Rider_delay'; all other breached orders are counted as
+  // "store delay". Adjust this logic if your actual attribution differs.
+  const riderDelayQ = `SELECT COUNT(${O.awb}) WHERE ${O.breach} = 'Breach' AND ${O.delay} = 'Rider_delay' ${where ? "AND " + where.replace("WHERE ", "") : ""}`;
+  const riderDelayTable = await gvizQuery(ORDERS_GID, riderDelayQ);
+  const [[riderBreachCount = 0] = []] = tableRows(riderDelayTable);
+  const storeBreachCount = (breachCount || 0) - (riderBreachCount || 0);
+  document.getElementById("kpiRiderDelay").textContent = total ? fmtPct(riderBreachCount / total) : "–";
+  document.getElementById("kpiStoreDelay").textContent = total ? fmtPct(storeBreachCount / total) : "–";
 
   // Rider tab KPIs — active riders today + avg login hours
   const riderWhere = currentCity ? `WHERE ${R.city} = '${currentCity.replace(/'/g, "\\'")}'` : "";
@@ -267,6 +280,52 @@ async function loadRiderTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${name ?? riderId ?? ""}</td><td>${hub ?? ""}</td><td>${fmtInt(orders)}</td><td>${fmtNum(avgAccept)}</td><td>${fmtNum(avgIntent)}</td><td class="${cls}">${pct.toFixed(1)}%</td><td>${loginHrs != null ? fmtNum(loginHrs, 1) : "–"}</td>`;
     tbody.appendChild(tr);
+  });
+}
+
+/* Worst-performing stores: overall top 15, and top 5 per city, by breach % (min 15 orders to filter noise) */
+const MIN_ORDERS_FOR_RANKING = 15;
+
+async function loadWorstStores() {
+  const where = buildWhere();
+  const q = `SELECT ${O.hub}, ${O.city}, COUNT(${O.awb}), COUNT(${O.breach}) ${where} GROUP BY ${O.hub}, ${O.city}`;
+  const table = await gvizQuery(ORDERS_GID, q);
+  const rows = tableRows(table)
+    .map(([hub, city, orders, breachCount]) => ({
+      hub, city, orders: orders || 0,
+      pct: orders ? (100 * (breachCount || 0)) / orders : 0
+    }))
+    .filter(r => r.orders >= MIN_ORDERS_FOR_RANKING);
+
+  // Overall worst 15
+  const worstOverall = [...rows].sort((a, b) => b.pct - a.pct).slice(0, 15);
+  renderStoreRankTable("worstStoresTable", worstOverall);
+
+  // Worst 5 per city
+  const byCity = new Map();
+  rows.forEach(r => {
+    if (!byCity.has(r.city)) byCity.set(r.city, []);
+    byCity.get(r.city).push(r);
+  });
+  const worstPerCity = [];
+  [...byCity.keys()].sort().forEach(city => {
+    const top5 = byCity.get(city).sort((a, b) => b.pct - a.pct).slice(0, 5);
+    worstPerCity.push(...top5);
+  });
+  renderStoreRankTable("worstStoresByCityTable", worstPerCity, true);
+}
+
+function renderStoreRankTable(tableId, rows, showCityGroups) {
+  const tbody = document.querySelector(`#${tableId} tbody`);
+  tbody.innerHTML = "";
+  let lastCity = null;
+  rows.forEach(r => {
+    const cls = r.pct > 8 ? "breach-high" : r.pct > 4 ? "breach-mid" : "";
+    const tr = document.createElement("tr");
+    const cityCell = showCityGroups && r.city !== lastCity ? r.city : (showCityGroups ? "" : r.city);
+    tr.innerHTML = `<td>${r.hub ?? ""}</td><td>${cityCell ?? ""}</td><td>${fmtInt(r.orders)}</td><td class="${cls}">${r.pct.toFixed(1)}%</td>`;
+    tbody.appendChild(tr);
+    lastCity = r.city;
   });
 }
 
