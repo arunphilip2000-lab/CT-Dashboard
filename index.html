@@ -3,220 +3,77 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Live Stores Performance — Amazonnow LIVE</title>
-<style>
-  :root {
-    --bg: #f6f7fb;
-    --card-bg: #ffffff;
-    --card-border: #e7e9f0;
-    --label: #6b7a99;
-    --value-dark: #1c2333;
-    --red: #e0294a;
-    --green: #1a9c5a;
-    --shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-  }
-
-  * { box-sizing: border-box; }
-
-  body {
-    margin: 0;
-    padding: 32px;
-    background: var(--bg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--value-dark);
-  }
-
-  .page-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--value-dark);
-    margin: 0 0 18px 2px;
-  }
-
-  .section-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--value-dark);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    margin: 32px 0 14px 2px;
-  }
-
-  .card-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 10px;
-    box-shadow: var(--shadow);
-    padding: 16px 20px;
-    width: 210px;
-    min-height: 84px;
-  }
-
-  .card .label {
-    font-size: 11.5px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: var(--label);
-    text-transform: uppercase;
-    line-height: 1.4;
-    margin-bottom: 10px;
-  }
-
-  .card .value {
-    font-size: 24px;
-    font-weight: 700;
-    line-height: 1;
-  }
-
-  .value.dark { color: var(--value-dark); }
-  .value.red  { color: var(--red); }
-  .value.green { color: var(--green); }
-
-  .table-wrap {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 10px;
-    box-shadow: var(--shadow);
-    overflow-x: auto;
-  }
-
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 12.5px;
-    white-space: nowrap;
-  }
-
-  thead th {
-    position: sticky;
-    top: 0;
-    background: #fafbfd;
-    color: var(--label);
-    text-transform: uppercase;
-    font-size: 10.5px;
-    letter-spacing: 0.02em;
-    font-weight: 700;
-    text-align: center;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--card-border);
-  }
-
-  thead th:nth-child(2), thead th:nth-child(3) { text-align: left; }
-
-  tbody td {
-    padding: 8px 12px;
-    text-align: center;
-    border-bottom: 1px solid #f0f1f6;
-    color: var(--value-dark);
-  }
-
-  tbody td:nth-child(2), tbody td:nth-child(3) { text-align: left; }
-
-  tbody tr:nth-child(even) { background: #fbfcfe; }
-  tbody tr:hover { background: #f0f4ff; }
-
-  tr.total-row td {
-    font-weight: 700;
-    background: #eef1f8 !important;
-    border-top: 2px solid #d7dcea;
-  }
-
-  .red-txt { color: var(--red); font-weight: 600; }
-  .green-txt { color: var(--green); font-weight: 600; }
-</style>
+<title>Live CT Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
 <body>
 
-  <div class="page-title">Live Stores Performance — Amazonnow LIVE</div>
-
-  <div class="card-grid">
-
-    <div class="card">
-      <div class="label">Total OPD<br>(31 hubs)</div>
-      <div class="value dark">1,978</div>
-    </div>
-
-    <div class="card">
-      <div class="label">Total DAU</div>
-      <div class="value dark">250</div>
-    </div>
-
-    <div class="card">
-      <div class="label">OR2A (Wt Avg)</div>
-      <div class="value red">1.28</div>
-    </div>
-
-    <div class="card">
-      <div class="label">S2P (Wt Avg)</div>
-      <div class="value green">2.04</div>
-    </div>
-
-    <div class="card">
-      <div class="label">OTP+3min (Wt Avg)</div>
-      <div class="value green">90.0%</div>
-    </div>
-
-    <div class="card">
-      <div class="label">Rider Delay (Wt Avg)</div>
-      <div class="value red">7.9%</div>
-    </div>
-
-    <div class="card">
-      <div class="label">Store Delay (Wt Avg)</div>
-      <div class="value red">2.1%</div>
-    </div>
-
+<header class="topbar">
+  <div class="brand">Live CT Dashboard</div>
+  <div class="filters">
+    <select id="filterCity"><option value="">All cities</option></select>
+    <select id="filterLive">
+      <option value="">All orders</option>
+      <option value="Live">Live only</option>
+      <option value="Non Live">Non-live only</option>
+    </select>
+    <button id="refreshBtn">Refresh now</button>
   </div>
-
-  <div class="section-title">Hub-level performance (31 hubs, sorted by Rider delay % descending)</div>
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr><th>SLNO</th><th>City_name</th><th>Hub_name</th><th>OPD</th><th>DAU</th><th>OR2A (p75)</th><th>S2P (p75)</th><th>Avg. Creation to pack</th><th>Avg. Creation to Geofence</th><th>Avg LM</th><th>OTP+3min</th><th>Rider delay</th><th>Store Delay</th><th>BTS%</th><th>BTO%</th><th>DSR</th><th>FOD</th></tr>
-      </thead>
-      <tbody>
-      <tr class=""><td class="">1</td><td class="">Chennai</td><td class="">CHN_Royapettah_ANow_TCF7</td><td class="">53</td><td class="">6.0</td><td class="">29.80</td><td class="">1.47</td><td class="">2.7</td><td class="">51.2</td><td class="">3.5</td><td class="green-txt">26.4%</td><td class="red-txt">66.6%</td><td class="red-txt">6.9%</td><td class="">14.8</td><td class="">73.6%</td><td class="">98.1%</td><td class="">1</td></tr>
-      <tr class=""><td class="">2</td><td class="">Bengaluru</td><td class="">BLR_Sidedahalli_ANow_TBW4</td><td class="">106</td><td class="">13.0</td><td class="">1.27</td><td class="">1.88</td><td class="">0.9</td><td class="">45.0</td><td class="">4.2</td><td class="green-txt">69.8%</td><td class="red-txt">30.2%</td><td class="red-txt">0.0%</td><td class="">22.1</td><td class="">30.2%</td><td class="">95.3%</td><td class="">3</td></tr>
-      <tr class=""><td class="">3</td><td class="">Faridabad</td><td class="">NCR_MathurRoad_ANow_TFB5</td><td class="">14</td><td class="">3.0</td><td class="">0.28</td><td class="">3.67</td><td class="">2.4</td><td class="">31.0</td><td class="">4.6</td><td class="green-txt">78.6%</td><td class="red-txt">19.9%</td><td class="red-txt">1.5%</td><td class="">9.0</td><td class="">21.4%</td><td class="">92.9%</td><td class="">1</td></tr>
-      <tr class=""><td class="">4</td><td class="">Mumbai</td><td class="">MUM_BapatMarg_ANow_TMQ9</td><td class="">11</td><td class="">3.0</td><td class="">1.10</td><td class="">2.40</td><td class="">1.9</td><td class="">37.7</td><td class="">1.7</td><td class="green-txt">81.8%</td><td class="red-txt">16.5%</td><td class="red-txt">1.7%</td><td class="">17.3</td><td class="">18.2%</td><td class="">90.9%</td><td class="">1</td></tr>
-      <tr class=""><td class="">5</td><td class="">Delhi</td><td class="">NCR_Pitampura_ANow_TDN2</td><td class="">17</td><td class="">4.0</td><td class="">1.20</td><td class="">2.57</td><td class="">2.3</td><td class="">18.7</td><td class="">0.9</td><td class="green-txt">82.4%</td><td class="red-txt">14.5%</td><td class="red-txt">3.1%</td><td class="">3.6</td><td class="">17.6%</td><td class="">100.0%</td><td class="">0</td></tr>
-      <tr class=""><td class="">6</td><td class="">Bengaluru</td><td class="">BLR_KengeriHobli_ANow_TBR7</td><td class="">67</td><td class="">5.0</td><td class="">0.70</td><td class="">7.02</td><td class="">4.6</td><td class="">31.2</td><td class="">2.1</td><td class="green-txt">67.2%</td><td class="red-txt">11.8%</td><td class="red-txt">21.1%</td><td class="">16.9</td><td class="">32.8%</td><td class="">100.0%</td><td class="">0</td></tr>
-      <tr class=""><td class="">7</td><td class="">Delhi</td><td class="">NCR_Meharulidt_ANow_TDO3</td><td class="">70</td><td class="">9.0</td><td class="">0.30</td><td class="">2.52</td><td class="">2.1</td><td class="">27.8</td><td class="">1.7</td><td class="green-txt">87.1%</td><td class="red-txt">9.2%</td><td class="red-txt">3.7%</td><td class="">13.3</td><td class="">10.0%</td><td class="">95.7%</td><td class="">1</td></tr>
-      <tr class=""><td class="">8</td><td class="">Delhi</td><td class="">NCR_UttamNagar_ANow_TDL6</td><td class="">45</td><td class="">7.0</td><td class="">0.60</td><td class="">2.32</td><td class="">3.8</td><td class="">29.4</td><td class="">2.2</td><td class="green-txt">88.9%</td><td class="red-txt">8.9%</td><td class="red-txt">2.2%</td><td class="">11.2</td><td class="">11.1%</td><td class="">100.0%</td><td class="">0</td></tr>
-      <tr class=""><td class="">9</td><td class="">Noida</td><td class="">NCR_Buddhanagar_ANow_TNG9</td><td class="">100</td><td class="">14.0</td><td class="">1.32</td><td class="">1.95</td><td class="">1.8</td><td class="">35.8</td><td class="">3.6</td><td class="green-txt">91.0%</td><td class="red-txt">8.5%</td><td class="red-txt">0.4%</td><td class="">17.3</td><td class="">9.0%</td><td class="">99.0%</td><td class="">0</td></tr>
-      <tr class=""><td class="">10</td><td class="">Ahmedabad</td><td class="">AMD_Solaoverbridge_ANow_TEA3</td><td class="">99</td><td class="">14.0</td><td class="">0.20</td><td class="">2.03</td><td class="">1.6</td><td class="">27.7</td><td class="">2.2</td><td class="green-txt">92.9%</td><td class="red-txt">6.8%</td><td class="red-txt">0.3%</td><td class="">15.4</td><td class="">7.1%</td><td class="">99.0%</td><td class="">1</td></tr>
-      <tr class=""><td class="">11</td><td class="">Faridabad</td><td class="">NCR_Faridabad_ANow_TFB1</td><td class="">79</td><td class="">10.0</td><td class="">0.50</td><td class="">2.60</td><td class="">2.3</td><td class="">23.7</td><td class="">1.6</td><td class="green-txt">92.4%</td><td class="red-txt">6.3%</td><td class="red-txt">1.2%</td><td class="">12.4</td><td class="">7.6%</td><td class="">100.0%</td><td class="">0</td></tr>
-      <tr class=""><td class="">12</td><td class="">Chandigarh</td><td class="">CHA_Punchkula_ANow_TOA9</td><td class="">93</td><td class="">8.0</td><td class="">0.20</td><td class="">2.60</td><td class="">2.0</td><td class="">19.1</td><td class="">1.9</td><td class="green-txt">93.5%</td><td class="red-txt">5.9%</td><td class="red-txt">0.6%</td><td class="">7.0</td><td class="">6.5%</td><td class="">96.8%</td><td class="">3</td></tr>
-      <tr class=""><td class="">13</td><td class="">Gurgaon</td><td class="">NCR_IMTManesar_ANow_TDK8</td><td class="">68</td><td class="">8.0</td><td class="">0.82</td><td class="">1.51</td><td class="">1.4</td><td class="">21.7</td><td class="">2.1</td><td class="green-txt">94.1%</td><td class="red-txt">5.4%</td><td class="red-txt">0.4%</td><td class="">10.0</td><td class="">5.9%</td><td class="">94.1%</td><td class="">3</td></tr>
-      <tr class=""><td class="">14</td><td class="">Jaipur</td><td class="">JAI_TonkPhatak_ANow_TJB2</td><td class="">86</td><td class="">8.0</td><td class="">0.17</td><td class="">2.68</td><td class="">2.0</td><td class="">18.3</td><td class="">1.9</td><td class="green-txt">94.2%</td><td class="red-txt">5.2%</td><td class="red-txt">0.6%</td><td class="">6.5</td><td class="">5.8%</td><td class="">97.7%</td><td class="">1</td></tr>
-      <tr class=""><td class="">15</td><td class="">Gurgaon</td><td class="">NCR_Chauma_ANow_TFA5</td><td class="">88</td><td class="">14.0</td><td class="">0.70</td><td class="">2.26</td><td class="">1.8</td><td class="">25.3</td><td class="">1.9</td><td class="green-txt">88.6%</td><td class="red-txt">3.4%</td><td class="red-txt">8.0%</td><td class="">10.8</td><td class="">10.2%</td><td class="">98.9%</td><td class="">0</td></tr>
-      <tr class=""><td class="">16</td><td class="">Ghaziabad</td><td class="">NCR_Mohannagar_ANow_TZA2</td><td class="">93</td><td class="">8.0</td><td class="">0.20</td><td class="">2.53</td><td class="">1.8</td><td class="">22.9</td><td class="">2.4</td><td class="green-txt">91.4%</td><td class="red-txt">3.3%</td><td class="red-txt">5.3%</td><td class="">9.4</td><td class="">8.6%</td><td class="">94.6%</td><td class="">1</td></tr>
-      <tr class=""><td class="">17</td><td class="">Chandigarh</td><td class="">CHA_Mohali_ANow_TOB1</td><td class="">33</td><td class="">5.0</td><td class="">0.70</td><td class="">2.27</td><td class="">1.9</td><td class="">14.8</td><td class="">2.0</td><td class="green-txt">97.0%</td><td class="red-txt">2.9%</td><td class="red-txt">0.1%</td><td class="">4.4</td><td class="">3.0%</td><td class="">97.0%</td><td class="">0</td></tr>
-      <tr class=""><td class="">18</td><td class="">Chennai</td><td class="">CHN_Ponniammanmedu_ANow_TCF3</td><td class="">73</td><td class="">12.0</td><td class="">0.40</td><td class="">2.23</td><td class="">1.7</td><td class="">18.0</td><td class="">1.4</td><td class="green-txt">97.3%</td><td class="red-txt">2.7%</td><td class="red-txt">0.0%</td><td class="">8.9</td><td class="">2.7%</td><td class="">97.3%</td><td class="">1</td></tr>
-      <tr class=""><td class="">19</td><td class="">Mumbai</td><td class="">MUM_AmbernarthWest_ANow_TMQ1</td><td class="">101</td><td class="">7.0</td><td class="">0.80</td><td class="">2.37</td><td class="">1.7</td><td class="">24.0</td><td class="">1.8</td><td class="green-txt">86.1%</td><td class="red-txt">2.6%</td><td class="red-txt">11.3%</td><td class="">9.2</td><td class="">13.9%</td><td class="">92.1%</td><td class="">8</td></tr>
-      <tr class=""><td class="">20</td><td class="">Bengaluru</td><td class="">BLR_AttibeleHobli_ANow_TBV1</td><td class="">108</td><td class="">10.0</td><td class="">0.33</td><td class="">2.85</td><td class="">2.3</td><td class="">20.1</td><td class="">1.4</td><td class="green-txt">97.2%</td><td class="red-txt">2.6%</td><td class="red-txt">0.2%</td><td class="">8.7</td><td class="">2.8%</td><td class="">97.2%</td><td class="">2</td></tr>
-      <tr class=""><td class="">21</td><td class="">Delhi</td><td class="">NCR_AmritVihar_ANow_TDM7</td><td class="">76</td><td class="">11.0</td><td class="">0.42</td><td class="">2.04</td><td class="">1.7</td><td class="">18.0</td><td class="">1.2</td><td class="green-txt">97.4%</td><td class="red-txt">2.4%</td><td class="red-txt">0.2%</td><td class="">7.4</td><td class="">2.6%</td><td class="">100.0%</td><td class="">0</td></tr>
-      <tr class=""><td class="">22</td><td class="">Meerut</td><td class="">NCR_GangaNagar_ANow_TZB9</td><td class="">56</td><td class="">5.0</td><td class="">0.10</td><td class="">3.76</td><td class="">2.9</td><td class="">14.8</td><td class="">1.5</td><td class="green-txt">96.4%</td><td class="red-txt">2.3%</td><td class="red-txt">1.3%</td><td class="">5.8</td><td class="">3.6%</td><td class="">98.2%</td><td class="">0</td></tr>
-      <tr class=""><td class="">23</td><td class="">Mumbai</td><td class="">MUM_Siddarthnagar_ANow_TMR1</td><td class="">49</td><td class="">6.0</td><td class="">0.20</td><td class="">2.93</td><td class="">2.3</td><td class="">18.6</td><td class="">1.2</td><td class="green-txt">98.0%</td><td class="red-txt">1.9%</td><td class="red-txt">0.2%</td><td class="">6.7</td><td class="">2.0%</td><td class="">89.8%</td><td class="">4</td></tr>
-      <tr class=""><td class="">24</td><td class="">Delhi</td><td class="">NCR_Burati_ANow_TDD1</td><td class="">40</td><td class="">8.0</td><td class="">0.10</td><td class="">1.95</td><td class="">1.6</td><td class="">25.0</td><td class="">1.8</td><td class="green-txt">95.0%</td><td class="red-txt">1.8%</td><td class="red-txt">3.3%</td><td class="">11.2</td><td class="">2.5%</td><td class="">92.5%</td><td class="">2</td></tr>
-      <tr class=""><td class="">25</td><td class="">Faridabad</td><td class="">NCR_NITRailwayRoad_ANow_TFA8</td><td class="">57</td><td class="">9.0</td><td class="">0.70</td><td class="">2.82</td><td class="">1.9</td><td class="">16.1</td><td class="">1.3</td><td class="green-txt">98.2%</td><td class="red-txt">1.5%</td><td class="red-txt">0.2%</td><td class="">7.4</td><td class="">0.0%</td><td class="">96.5%</td><td class="">1</td></tr>
-      <tr class=""><td class="">26</td><td class="">Delhi</td><td class="">NCR_Rithala_ANow_TDM6</td><td class="">20</td><td class="">4.0</td><td class="">0.40</td><td class="">2.79</td><td class="">2.2</td><td class="">45.1</td><td class="">0.8</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">35.1</td><td class="">0.0%</td><td class="">100.0%</td><td class="">0</td></tr>
-      <tr class=""><td class="">27</td><td class="">Delhi</td><td class="">NCR_PremNagar_ANow_TDM1</td><td class="">40</td><td class="">5.0</td><td class="">0.12</td><td class="">2.20</td><td class="">1.6</td><td class="">16.7</td><td class="">1.1</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">6.6</td><td class="">0.0%</td><td class="">100.0%</td><td class="">0</td></tr>
-      <tr class=""><td class="">28</td><td class="">Lucknow</td><td class="">LKO_Vrindavan_ANow_TLB4</td><td class="">81</td><td class="">9.0</td><td class="">0.20</td><td class="">1.92</td><td class="">1.6</td><td class="">24.5</td><td class="">2.4</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">11.9</td><td class="">0.0%</td><td class="">98.8%</td><td class="">0</td></tr>
-      <tr class=""><td class="">29</td><td class="">Kolkata</td><td class="">KOL_NorthPargana_ANow_TKD4</td><td class="">51</td><td class="">7.0</td><td class="">0.40</td><td class="">1.97</td><td class="">1.7</td><td class="">23.3</td><td class="">2.2</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">10.0</td><td class="">0.0%</td><td class="">94.1%</td><td class="">0</td></tr>
-      <tr class=""><td class="">30</td><td class="">Meerut</td><td class="">NCR_Pallavapuram_ANow_TZB3</td><td class="">46</td><td class="">8.0</td><td class="">0.20</td><td class="">2.94</td><td class="">2.2</td><td class="">17.1</td><td class="">2.1</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">7.2</td><td class="">0.0%</td><td class="">100.0%</td><td class="">0</td></tr>
-      <tr class=""><td class="">31</td><td class="">Ahmedabad</td><td class="">AMD_Saibabatemple_ANow_TEA9</td><td class="">58</td><td class="">10.0</td><td class="">0.20</td><td class="">3.12</td><td class="">2.2</td><td class="">21.5</td><td class="">2.4</td><td class="green-txt">100.0%</td><td class="red-txt">0.0%</td><td class="red-txt">0.0%</td><td class="">9.2</td><td class="">0.0%</td><td class="">98.3%</td><td class="">0</td></tr>
-      <tr class="total-row"><td class=""></td><td class="">All Cities</td><td class="">Grand Total</td><td class="">1,978</td><td class="">250.0</td><td class="">0.40</td><td class="">2.47</td><td class="">2.0</td><td class="">24.9</td><td class="">2.1</td><td class="green-txt">90.0%</td><td class="red-txt">7.9%</td><td class="red-txt">2.1%</td><td class="">11.0</td><td class="">9.8%</td><td class="">97.1%</td><td class="">34</td></tr>
-      </tbody>
-    </table>
+  <div class="status">
+    <span id="statusText">Loading…</span>
+    <span id="liveDot" class="live-dot"></span>
   </div>
+</header>
 
+<main>
+
+  <section class="kpi-row" id="kpiRow">
+    <div class="kpi-card"><p class="kpi-label">Total orders</p><p class="kpi-value" id="kpiTotal">–</p></div>
+    <div class="kpi-card"><p class="kpi-label">SLA breach %</p><p class="kpi-value danger" id="kpiBreach">–</p></div>
+    <div class="kpi-card"><p class="kpi-label">Avg accept gap</p><p class="kpi-value" id="kpiAccept">–</p></div>
+    <div class="kpi-card"><p class="kpi-label">Avg reach→intent</p><p class="kpi-value" id="kpiIntent">–</p></div>
+    <div class="kpi-card"><p class="kpi-label">Active riders today</p><p class="kpi-value" id="kpiRiders">–</p></div>
+    <div class="kpi-card"><p class="kpi-label">Avg login hours</p><p class="kpi-value" id="kpiLoginHrs">–</p></div>
+  </section>
+
+  <section class="chart-row">
+    <div class="card">
+      <p class="card-title">Orders &amp; breach % by hour</p>
+      <div class="chart-wrap"><canvas id="hourChart" role="img" aria-label="Line chart of breach percent by hour of day"></canvas></div>
+    </div>
+    <div class="card">
+      <p class="card-title">Delay source split</p>
+      <div class="chart-wrap"><canvas id="delayChart" role="img" aria-label="Bar chart of delay sources"></canvas></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <p class="card-title">Hub-level CT and breach</p>
+    <div class="table-wrap">
+      <table id="hubTable">
+        <thead>
+          <tr><th>Hub</th><th>City</th><th>Orders</th><th>Avg accept gap</th><th>Breach %</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <p class="card-title">Rider-level CT, breach and login hours</p>
+    <div class="table-wrap">
+      <table id="riderTable">
+        <thead>
+          <tr><th>Rider</th><th>Hub</th><th>Orders</th><th>Avg accept gap</th><th>Avg reach→intent</th><th>Breach %</th><th>Login hrs today</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<script src="app.js"></script>
 </body>
 </html>
