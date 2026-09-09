@@ -116,7 +116,7 @@ function setStatus(text, isError) {
 let cityFilterLoaded = false;
 async function loadCityFilter() {
   if (cityFilterLoaded) return;
-  const table = await gvizQuery(ORDERS_GID, `SELECT ${O.city} GROUP BY ${O.city} ORDER BY ${O.city}`);
+  const table = await gvizQuery(ORDERS_GID, `SELECT ${O.city}, COUNT(${O.awb}) GROUP BY ${O.city} ORDER BY ${O.city}`);
   const sel = document.getElementById("filterCity");
   tableRows(table).forEach(([city]) => {
     if (!city) return;
