@@ -119,8 +119,6 @@ async function loadDashboard() {
     await loadKpis();
     setStatus("Loading hourly trend…");
     await loadHourly();
-    setStatus("Loading delay split…");
-    await loadDelaySplit();
     setStatus("Loading hub table…");
     await loadHubTable();
     setStatus("Loading worst-performing stores…");
@@ -223,14 +221,49 @@ async function loadHourly() {
   const riderTable = await gvizQuery(ORDERS_GID, riderQ);
   const riderMap = new Map(tableRows(riderTable).map(r => [r[0], r[1] || 0]));
 
+  // Distinct riders per hour: query (hour, riderId) pairs — one row per
+  // combination — then count rows per hour client-side. Far smaller than
+  // pulling every raw order row, and gviz has no COUNT(DISTINCT).
+  const riderCountWhere = where ? `${where} AND ${O.riderId} IS NOT NULL` : `WHERE ${O.riderId} IS NOT NULL`;
+  const riderPairQ = `SELECT ${O.hour}, ${O.riderId}, COUNT(${O.awb}) ${riderCountWhere} GROUP BY ${O.hour}, ${O.riderId}`;
+  const riderPairTable = await gvizQuery(ORDERS_GID, riderPairQ);
+  const distinctRidersByHour = new Map();
+  tableRows(riderPairTable).forEach(([hour]) => {
+    distinctRidersByHour.set(hour, (distinctRidersByHour.get(hour) || 0) + 1);
+  });
+
   const labels = totalRows.map(r => `${r[0]}:00`);
   const orders = totalRows.map(r => r[1] || 0);
   const breachCounts = totalRows.map(r => r[2] || 0);
+  const riders = totalRows.map(r => distinctRidersByHour.get(r[0]) || 0);
   const riderBreachPct = totalRows.map(r => (r[1] ? (100 * (riderMap.get(r[0]) || 0)) / r[1] : 0));
   const storeBreachPct = totalRows.map((r, i) => (r[1] ? (100 * ((r[2] || 0) - (riderMap.get(r[0]) || 0))) / r[1] : 0));
 
-  lastHourlyData = { labels, orders, breachCounts, riderBreachPct, storeBreachPct };
+  lastHourlyData = { labels, orders, breachCounts, riders, riderBreachPct, storeBreachPct };
   renderHourChart();
+  renderVolumeChart();
+}
+
+let volumeChart;
+let volMetric = "orders"; // "orders" | "riders" | "breaches"
+
+function renderVolumeChart() {
+  if (!lastHourlyData) return;
+  const { labels, orders, breachCounts, riders } = lastHourlyData;
+  const data = volMetric === "orders" ? orders : volMetric === "riders" ? riders : breachCounts;
+
+  const ctx = document.getElementById("volumeChart");
+  if (volumeChart) volumeChart.destroy();
+  volumeChart = new Chart(ctx, {
+    type: "bar",
+    data: { labels, datasets: [{ data, backgroundColor: "#14532d", borderRadius: 3 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { ticks: { color: "#6b6b64" }, grid: { color: "#eee" } }, x: { grid: { display: false } } }
+    }
+  });
 }
 
 function renderHourChart() {
@@ -263,31 +296,7 @@ function renderHourChart() {
   });
 }
 
-/* Delay source split (by category) */
-let delayChart;
-async function loadDelaySplit() {
-  const where = buildWhere();
-  const extra = where ? `${where} AND ${O.delaySource} IS NOT NULL` : `WHERE ${O.delaySource} IS NOT NULL`;
-  const q = `SELECT ${O.delaySource}, COUNT(${O.awb}) ${extra} GROUP BY ${O.delaySource} ORDER BY COUNT(${O.awb}) DESC`;
-  const table = await gvizQuery(ORDERS_GID, q);
-  const rows = tableRows(table);
-
-  const labels = rows.map(r => r[0] || "Unspecified");
-  const values = rows.map(r => r[1] || 0);
-
-  const ctx = document.getElementById("delayChart");
-  if (delayChart) delayChart.destroy();
-  delayChart = new Chart(ctx, {
-    type: "bar",
-    data: { labels, datasets: [{ data: values, backgroundColor: "#d97706", borderRadius: 4 }] },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { ticks: { color: "#6b6b64" }, grid: { color: "#eee" } }, x: { grid: { display: false } } }
-    }
-  });
-}
+/* ============================================================ */
 
 /* Hub-level table */
 async function loadHubTable() {
@@ -442,12 +451,21 @@ document.getElementById("todayBtn").addEventListener("click", () => { currentDat
 document.getElementById("yestBtn").addEventListener("click", () => { const d = new Date(); d.setDate(d.getDate() - 1); currentDate = isoDate(d); document.getElementById("filterDate").value = currentDate; loadDashboard(); });
 document.getElementById("refreshBtn").addEventListener("click", loadDashboard);
 document.getElementById("csvBtn").addEventListener("click", downloadCsv);
-document.querySelectorAll(".toggle-btn").forEach(btn => {
+document.querySelectorAll(".toggle-btn:not(.vol-toggle)").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".toggle-btn:not(.vol-toggle)").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     hourBarMetric = btn.dataset.metric;
     renderHourChart();
+  });
+});
+
+document.querySelectorAll(".vol-toggle").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".vol-toggle").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    volMetric = btn.dataset.volMetric;
+    renderVolumeChart();
   });
 });
 
