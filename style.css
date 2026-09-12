@@ -1,112 +1,152 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Live CT Dashboard</title>
-<link rel="stylesheet" href="style.css" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-</head>
-<body>
+:root {
+  --green: #14532d;
+  --green-light: #16a34a;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --bg: #f4f5f2;
+  --card: #ffffff;
+  --border: #e3e3de;
+  --text: #1a1a18;
+  --text-muted: #6b6b64;
+}
 
-<header class="topbar">
-  <div class="brand">Live CT Dashboard</div>
-  <div class="filters">
-    <select id="filterCity"><option value="">All cities</option></select>
-    <select id="filterHub"><option value="">All stores</option></select>
-    <select id="filterLive">
-      <option value="">All orders</option>
-      <option value="Live">Live only</option>
-      <option value="Non Live">Non-live only</option>
-    </select>
-    <input type="date" id="filterDate" />
-    <button id="todayBtn" class="quick-date">Today</button>
-    <button id="yestBtn" class="quick-date">Yesterday</button>
-    <button id="refreshBtn">Refresh now</button>
-    <button id="csvBtn">Download CSV</button>
-  </div>
-  <div class="status">
-    <span id="statusText">Loading…</span>
-    <span id="liveDot" class="live-dot"></span>
-  </div>
-</header>
+* { box-sizing: border-box; }
 
-<section class="hero-band">
-  <div class="hero-stat"><p class="hero-value" id="heroOtp">–</p><p class="hero-label">OTP+3</p></div>
-  <div class="hero-stat"><p class="hero-value" id="heroRiderDelay">–</p><p class="hero-label">Rider delay</p></div>
-  <div class="hero-stat"><p class="hero-value" id="heroStoreDelay">–</p><p class="hero-label">Store delay</p></div>
-</section>
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
 
-<main>
+.topbar {
+  background: var(--green);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  flex-wrap: wrap;
+}
 
-  <section class="kpi-row" id="kpiRow">
-    <div class="kpi-card"><p class="kpi-label">Total orders</p><p class="kpi-value" id="kpiTotal">–</p></div>
-    <div class="kpi-card"><p class="kpi-label">SLA breach %</p><p class="kpi-value danger" id="kpiBreach">–</p></div>
-    <div class="kpi-card"><p class="kpi-label">Avg accept gap</p><p class="kpi-value" id="kpiAccept">–</p></div>
-    <div class="kpi-card"><p class="kpi-label">Avg reach→intent</p><p class="kpi-value" id="kpiIntent">–</p></div>
-    <div class="kpi-card"><p class="kpi-label">Active riders today</p><p class="kpi-value" id="kpiRiders">–</p></div>
-    <div class="kpi-card"><p class="kpi-label">Avg login hours</p><p class="kpi-value" id="kpiLoginHrs">–</p></div>
-  </section>
+.brand { font-weight: 600; font-size: 16px; margin-right: 8px; }
 
-  <section class="chart-row">
-    <div class="card">
-      <p class="card-title">Orders &amp; breach % by hour</p>
-      <div class="chart-wrap"><canvas id="hourChart" role="img" aria-label="Line chart of breach percent by hour of day"></canvas></div>
-    </div>
-    <div class="card">
-      <p class="card-title">Delay source split</p>
-      <div class="chart-wrap"><canvas id="delayChart" role="img" aria-label="Bar chart of delay sources"></canvas></div>
-    </div>
-  </section>
+.filters { display: flex; gap: 8px; flex-wrap: wrap; }
 
-  <section class="card">
-    <p class="card-title">Hub-level CT and breach</p>
-    <div class="table-wrap">
-      <table id="hubTable">
-        <thead>
-          <tr><th>Hub</th><th>City</th><th>Orders</th><th>Avg accept gap</th><th>Avg LM (km)</th><th>Breach %</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
+.filters select, .filters button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  font-size: 13px;
+}
 
-  <section class="card">
-    <p class="card-title">Top 15 worst-performing stores overall</p>
-    <p class="card-subtitle">Ranked by breach %, min 15 orders</p>
-    <div class="table-wrap">
-      <table id="worstStoresTable">
-        <thead><tr><th>Hub</th><th>City</th><th>Orders</th><th>Breach %</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
+.filters select option {
+  color: #1a1a18;
+  background: #fff;
+}
 
-  <section class="card">
-    <p class="card-title">Top 5 worst-performing stores per city</p>
-    <p class="card-subtitle">Ranked by breach %, min 15 orders</p>
-    <div class="table-wrap">
-      <table id="worstStoresByCityTable">
-        <thead><tr><th>Hub</th><th>City</th><th>Orders</th><th>Breach %</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
+.filters button {
+  cursor: pointer;
+  background: rgba(255,255,255,0.15);
+}
+.filters button:hover { background: rgba(255,255,255,0.25); }
+.filters button.quick-date { font-size: 12px; padding: 6px 8px; }
 
-  <section class="card">
-    <p class="card-title">Rider-level CT, breach and login hours</p>
-    <div class="table-wrap">
-      <table id="riderTable">
-        <thead>
-          <tr><th>Rider</th><th>Hub</th><th>Orders</th><th>Avg accept gap</th><th>Avg reach→intent</th><th>Breach %</th><th>Login hrs today</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
+.status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #d9f2e2;
+}
 
-</main>
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 0 3px rgba(74,222,128,0.25);
+}
 
-<script src="app.js"></script>
-</body>
-</html>
+.hero-band {
+  background: var(--green);
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  padding: 18px 20px 22px;
+  flex-wrap: wrap;
+}
+
+.hero-stat { text-align: center; }
+.hero-value { color: #fbbf24; font-size: 30px; font-weight: 700; margin: 0; }
+.hero-label { color: #d9f2e2; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; margin: 4px 0 0; }
+
+main {
+  padding: 20px;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.kpi-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.kpi-label { font-size: 12px; color: var(--text-muted); margin: 0 0 6px; }
+.kpi-value { font-size: 22px; font-weight: 600; margin: 0; }
+.kpi-value.danger { color: var(--danger); }
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 800px) {
+  .chart-row { grid-template-columns: 1fr; }
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+
+.card-title { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+.card-subtitle { font-size: 12px; color: var(--text-muted); margin: 0 0 12px; }
+
+.chart-wrap { position: relative; height: 220px; }
+
+.table-wrap { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+td { padding: 8px; border-bottom: 1px solid var(--border); }
+
+tr:hover td { background: #fafaf8; }
+
+.breach-high { color: var(--danger); font-weight: 600; }
+.breach-mid { color: var(--warning); font-weight: 600; }
