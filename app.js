@@ -211,13 +211,14 @@ async function loadKpis() {
 let hourChart;
 let hourBarMetric = "orders"; // "orders" | "breaches"
 let lastHourlyData = null; // cached so the toggle can re-render without re-querying
+const ALL_HOURS = Array.from({ length: 24 }, (_, i) => i); // always show 0–23, even hours with no data yet
 
-/* Hourly orders + rider/store breach % split */
+/* Hourly orders + rider/store breach % split — always spans the full 24 hours */
 async function loadHourly() {
   const where = buildWhere();
   const totalQ = `SELECT ${O.hour}, COUNT(${O.awb}), COUNT(${O.breach}) ${where} GROUP BY ${O.hour} ORDER BY ${O.hour}`;
   const totalTable = await gvizQuery(ORDERS_GID, totalQ);
-  const totalRows = tableRows(totalTable).filter(r => r[0] != null);
+  const totalMap = new Map(tableRows(totalTable).filter(r => r[0] != null).map(r => [r[0], { orders: r[1] || 0, breach: r[2] || 0 }]));
 
   const riderWhereExtra = where ? `${where} AND ${O.breach} = 'Breach' AND ${O.delay} = 'Rider_delay'` : `WHERE ${O.breach} = 'Breach' AND ${O.delay} = 'Rider_delay'`;
   const riderQ = `SELECT ${O.hour}, COUNT(${O.awb}) ${riderWhereExtra} GROUP BY ${O.hour} ORDER BY ${O.hour}`;
@@ -235,12 +236,19 @@ async function loadHourly() {
     distinctRidersByHour.set(hour, (distinctRidersByHour.get(hour) || 0) + 1);
   });
 
-  const labels = totalRows.map(r => `${r[0]}:00`);
-  const orders = totalRows.map(r => r[1] || 0);
-  const breachCounts = totalRows.map(r => r[2] || 0);
-  const riders = totalRows.map(r => distinctRidersByHour.get(r[0]) || 0);
-  const riderBreachPct = totalRows.map(r => (r[1] ? (100 * (riderMap.get(r[0]) || 0)) / r[1] : 0));
-  const storeBreachPct = totalRows.map((r, i) => (r[1] ? (100 * ((r[2] || 0) - (riderMap.get(r[0]) || 0))) / r[1] : 0));
+  const labels = ALL_HOURS.map(h => `${h}:00`);
+  const orders = ALL_HOURS.map(h => totalMap.get(h)?.orders || 0);
+  const breachCounts = ALL_HOURS.map(h => totalMap.get(h)?.breach || 0);
+  const riders = ALL_HOURS.map(h => distinctRidersByHour.get(h) || 0);
+  const riderBreachPct = ALL_HOURS.map(h => {
+    const o = totalMap.get(h)?.orders || 0;
+    return o ? (100 * (riderMap.get(h) || 0)) / o : 0;
+  });
+  const storeBreachPct = ALL_HOURS.map(h => {
+    const o = totalMap.get(h)?.orders || 0;
+    const b = totalMap.get(h)?.breach || 0;
+    return o ? (100 * (b - (riderMap.get(h) || 0))) / o : 0;
+  });
 
   lastHourlyData = { labels, orders, breachCounts, riders, riderBreachPct, storeBreachPct };
   renderHourChart();
@@ -416,7 +424,7 @@ async function loadHourlyReport() {
   // Actual orders, breach, rider-delay, rider-delay-in-rain per hour
   const totalQ = `SELECT ${O.hour}, COUNT(${O.awb}), COUNT(${O.breach}) ${where} GROUP BY ${O.hour} ORDER BY ${O.hour}`;
   const totalTable = await gvizQuery(ORDERS_GID, totalQ);
-  const totalRows = tableRows(totalTable).filter(r => r[0] != null);
+  const totalMap = new Map(tableRows(totalTable).filter(r => r[0] != null).map(r => [r[0], { orders: r[1] || 0, breach: r[2] || 0 }]));
 
   const riderWhereExtra = where ? `${where} AND ${O.breach} = 'Breach' AND ${O.delay} = 'Rider_delay'` : `WHERE ${O.breach} = 'Breach' AND ${O.delay} = 'Rider_delay'`;
   const riderQ = `SELECT ${O.hour}, COUNT(${O.awb}) ${riderWhereExtra} GROUP BY ${O.hour}`;
@@ -442,7 +450,9 @@ async function loadHourlyReport() {
 
   const tbody = document.querySelector("#hourlyReportTable tbody");
   tbody.innerHTML = "";
-  totalRows.forEach(([hour, orders, breachCount]) => {
+  ALL_HOURS.forEach(hour => {
+    const orders = totalMap.get(hour)?.orders || 0;
+    const breachCount = totalMap.get(hour)?.breach || 0;
     const projected = projMap.get(hour) || 0;
     const attainment = projected ? (100 * orders) / projected : null;
     const dau = dauMap.get(hour) || 0;
@@ -450,7 +460,7 @@ async function loadHourlyReport() {
     const avgLm = lmMap.get(hour);
     const riderDelayCount = riderMap.get(hour) || 0;
     const rainDelayCount = rainMap.get(hour) || 0;
-    const storeDelayCount = (breachCount || 0) - riderDelayCount;
+    const storeDelayCount = breachCount - riderDelayCount;
     const riderDelayPct = orders ? (100 * riderDelayCount) / orders : 0;
     const rainDelayPct = orders ? (100 * rainDelayCount) / orders : 0;
     const storeDelayPct = orders ? (100 * storeDelayCount) / orders : 0;
@@ -461,9 +471,9 @@ async function loadHourlyReport() {
       `<td>${fmtInt(dau)}</td>` +
       `<td>${oph != null ? oph.toFixed(2) : "–"}</td>` +
       `<td>${avgLm != null ? fmtNum(avgLm) : "–"}</td>` +
-      `<td class="${riderDelayPct > 5 ? "breach-high" : ""}">${riderDelayPct.toFixed(1)}%</td>` +
-      `<td>${rainDelayPct.toFixed(2)}%</td>` +
-      `<td class="${storeDelayPct > 5 ? "breach-high" : ""}">${storeDelayPct.toFixed(1)}%</td>`;
+      `<td class="${riderDelayPct > 5 ? "breach-high" : ""}">${orders ? riderDelayPct.toFixed(1) + "%" : "–"}</td>` +
+      `<td>${orders ? rainDelayPct.toFixed(2) + "%" : "–"}</td>` +
+      `<td class="${storeDelayPct > 5 ? "breach-high" : ""}">${orders ? storeDelayPct.toFixed(1) + "%" : "–"}</td>`;
     tbody.appendChild(tr);
   });
 }
