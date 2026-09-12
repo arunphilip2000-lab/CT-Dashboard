@@ -127,6 +127,21 @@ main {
   margin-bottom: 20px;
 }
 
+.card-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.card-header-row .card-title { margin: 0; }
+
+.toggle-group { display: flex; gap: 4px; }
+.toggle-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
+  border-radius: 16px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.toggle-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+
 .card-title { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
 .card-subtitle { font-size: 12px; color: var(--text-muted); margin: 0 0 12px; }
 
