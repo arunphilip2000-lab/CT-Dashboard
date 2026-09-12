@@ -60,9 +60,16 @@
       <div class="chart-wrap"><canvas id="hourChart" role="img" aria-label="Line chart of rider and store delay percent by hour of day"></canvas></div>
     </div>
     <div class="card">
-      <p class="card-title">Delay source split</p>
-      <p class="card-subtitle">Orders by recorded delay category, current filters</p>
-      <div class="chart-wrap"><canvas id="delayChart" role="img" aria-label="Bar chart of delay sources"></canvas></div>
+      <div class="card-header-row">
+        <p class="card-title">Hourly volume</p>
+        <div class="toggle-group">
+          <button class="toggle-btn vol-toggle active" data-vol-metric="orders">Orders</button>
+          <button class="toggle-btn vol-toggle" data-vol-metric="riders">Riders</button>
+          <button class="toggle-btn vol-toggle" data-vol-metric="breaches">Breaches</button>
+        </div>
+      </div>
+      <p class="card-subtitle">Orders by hour of the operating day (IST)</p>
+      <div class="chart-wrap"><canvas id="volumeChart" role="img" aria-label="Bar chart of hourly volume, switchable between orders, riders and breaches"></canvas></div>
     </div>
   </section>
 
