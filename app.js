@@ -35,6 +35,7 @@ const R = {
 
 let currentCity = "";
 let currentLive = "";
+let currentDate = "today"; // "today" | "yesterday" | ""
 let riderLoginCache = null; // reset each refresh so login hours stay current
 
 /* ---------- gviz fetch helper (JSONP, works from a static page) ---------- */
@@ -79,10 +80,25 @@ function tableRows(table) {
   return table.rows.map(r => r.c.map(c => (c ? c.v : null)));
 }
 
+function isoDate(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
 function buildWhere() {
   const clauses = [];
   if (currentCity) clauses.push(`${O.city} = '${currentCity.replace(/'/g, "\\'")}'`);
   if (currentLive) clauses.push(`${O.liveNonLive} = '${currentLive}'`);
+  if (currentDate === "today" || currentDate === "yesterday") {
+    const base = new Date();
+    if (currentDate === "yesterday") base.setDate(base.getDate() - 1);
+    const start = isoDate(base);
+    const next = new Date(base);
+    next.setDate(next.getDate() + 1);
+    const end = isoDate(next);
+    // Assumes creation_Date is a real Date-type column in the sheet.
+    // If it's stored as text this range comparison won't match — let us know.
+    clauses.push(`${O.creationDate} >= date '${start}' AND ${O.creationDate} < date '${end}'`);
+  }
   return clauses.length ? "WHERE " + clauses.join(" AND ") : "";
 }
 
@@ -161,8 +177,14 @@ async function loadKpis() {
   const riderDelayTable = await gvizQuery(ORDERS_GID, riderDelayQ);
   const [[riderBreachCount = 0] = []] = tableRows(riderDelayTable);
   const storeBreachCount = (breachCount || 0) - (riderBreachCount || 0);
-  document.getElementById("kpiRiderDelay").textContent = total ? fmtPct(riderBreachCount / total) : "–";
-  document.getElementById("kpiStoreDelay").textContent = total ? fmtPct(storeBreachCount / total) : "–";
+  document.getElementById("kpiRiderDelay") && (document.getElementById("kpiRiderDelay").textContent = total ? fmtPct(riderBreachCount / total) : "–");
+  document.getElementById("kpiStoreDelay") && (document.getElementById("kpiStoreDelay").textContent = total ? fmtPct(storeBreachCount / total) : "–");
+
+  // Hero band (top green strip). OTP+3 is APPROXIMATED as (1 - breach %) until
+  // you confirm the exact +3min grace-window formula your BI tool uses.
+  document.getElementById("heroOtp").textContent = total ? fmtPct(1 - breachCount / total) : "–";
+  document.getElementById("heroRiderDelay").textContent = total ? fmtPct(riderBreachCount / total) : "–";
+  document.getElementById("heroStoreDelay").textContent = total ? fmtPct(storeBreachCount / total) : "–";
 
   // Rider tab KPIs — active riders today + avg login hours
   const riderWhere = currentCity ? `WHERE ${R.city} = '${currentCity.replace(/'/g, "\\'")}'` : "";
@@ -238,17 +260,17 @@ async function loadDelaySplit() {
 /* Hub-level table */
 async function loadHubTable() {
   const where = buildWhere();
-  const q = `SELECT ${O.hub}, ${O.city}, COUNT(${O.awb}), AVG(${O.creationToAccept}), COUNT(${O.breach}) ${where} GROUP BY ${O.hub}, ${O.city} ORDER BY COUNT(${O.awb}) DESC LIMIT 20`;
+  const q = `SELECT ${O.hub}, ${O.city}, COUNT(${O.awb}), AVG(${O.creationToAccept}), AVG(${O.lm}), COUNT(${O.breach}) ${where} GROUP BY ${O.hub}, ${O.city} ORDER BY COUNT(${O.awb}) DESC LIMIT 20`;
   const table = await gvizQuery(ORDERS_GID, q);
   const rows = tableRows(table);
 
   const tbody = document.querySelector("#hubTable tbody");
   tbody.innerHTML = "";
-  rows.forEach(([hub, city, orders, avgAccept, breachCount]) => {
+  rows.forEach(([hub, city, orders, avgAccept, avgLm, breachCount]) => {
     const pct = orders ? (100 * (breachCount || 0)) / orders : 0;
     const cls = pct > 8 ? "breach-high" : pct > 4 ? "breach-mid" : "";
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${hub ?? ""}</td><td>${city ?? ""}</td><td>${fmtInt(orders)}</td><td>${fmtNum(avgAccept)}</td><td class="${cls}">${pct.toFixed(1)}%</td>`;
+    tr.innerHTML = `<td>${hub ?? ""}</td><td>${city ?? ""}</td><td>${fmtInt(orders)}</td><td>${fmtNum(avgAccept)}</td><td>${fmtNum(avgLm)}</td><td class="${cls}">${pct.toFixed(1)}%</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -329,10 +351,62 @@ function renderStoreRankTable(tableId, rows, showCityGroups) {
   });
 }
 
+/* ---------- CSV export ---------- */
+function tableToCsvRows(tableId) {
+  const table = document.getElementById(tableId);
+  const rows = [];
+  table.querySelectorAll("tr").forEach(tr => {
+    const cells = [...tr.children].map(td => `"${(td.textContent || "").replace(/"/g, '""')}"`);
+    rows.push(cells.join(","));
+  });
+  return rows;
+}
+
+function downloadCsv() {
+  const lines = [];
+  lines.push(`Live CT Dashboard export,${new Date().toLocaleString()}`);
+  lines.push(`Filters,City=${currentCity || "All"},Live=${currentLive || "All"},Date=${currentDate || "All"}`);
+  lines.push("");
+  lines.push("KPI,Value");
+  lines.push(`Total orders,${document.getElementById("kpiTotal").textContent}`);
+  lines.push(`SLA breach %,${document.getElementById("kpiBreach").textContent}`);
+  lines.push(`Avg accept gap,${document.getElementById("kpiAccept").textContent}`);
+  lines.push(`Avg reach→intent,${document.getElementById("kpiIntent").textContent}`);
+  lines.push(`Active riders today,${document.getElementById("kpiRiders").textContent}`);
+  lines.push(`Avg login hours,${document.getElementById("kpiLoginHrs").textContent}`);
+  lines.push(`OTP+3 (approx),${document.getElementById("heroOtp").textContent}`);
+  lines.push(`Rider delay %,${document.getElementById("heroRiderDelay").textContent}`);
+  lines.push(`Store delay %,${document.getElementById("heroStoreDelay").textContent}`);
+  lines.push("");
+  lines.push("Hub-level CT and breach");
+  lines.push(...tableToCsvRows("hubTable"));
+  lines.push("");
+  lines.push("Top 15 worst-performing stores overall");
+  lines.push(...tableToCsvRows("worstStoresTable"));
+  lines.push("");
+  lines.push("Top 5 worst-performing stores per city");
+  lines.push(...tableToCsvRows("worstStoresByCityTable"));
+  lines.push("");
+  lines.push("Rider-level CT, breach and login hours");
+  lines.push(...tableToCsvRows("riderTable"));
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ct-dashboard-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /* ---------- wiring ---------- */
 document.getElementById("filterCity").addEventListener("change", e => { currentCity = e.target.value; loadDashboard(); });
 document.getElementById("filterLive").addEventListener("change", e => { currentLive = e.target.value; loadDashboard(); });
+document.getElementById("filterDate").addEventListener("change", e => { currentDate = e.target.value; loadDashboard(); });
 document.getElementById("refreshBtn").addEventListener("click", loadDashboard);
+document.getElementById("csvBtn").addEventListener("click", downloadCsv);
 
 loadDashboard();
 setInterval(loadDashboard, REFRESH_MS);
