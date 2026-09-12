@@ -36,7 +36,7 @@ const R = {
 let currentCity = "";
 let currentHub = "";
 let currentLive = "";
-let currentDate = "today"; // "today" | "yesterday" | ""
+let currentDate = isoDate(new Date()); // "YYYY-MM-DD" from the date picker, or "" for all days
 let riderLoginCache = null; // reset each refresh so login hours stay current
 
 /* ---------- gviz fetch helper (JSONP, works from a static page) ---------- */
@@ -90,11 +90,9 @@ function buildWhere() {
   if (currentCity) clauses.push(`${O.city} = '${currentCity.replace(/'/g, "\\'")}'`);
   if (currentHub) clauses.push(`${O.hub} = '${currentHub.replace(/'/g, "\\'")}'`);
   if (currentLive) clauses.push(`${O.liveNonLive} = '${currentLive}'`);
-  if (currentDate === "today" || currentDate === "yesterday") {
-    const base = new Date();
-    if (currentDate === "yesterday") base.setDate(base.getDate() - 1);
-    const start = isoDate(base);
-    const next = new Date(base);
+  if (currentDate) {
+    const start = currentDate;
+    const next = new Date(currentDate + "T00:00:00");
     next.setDate(next.getDate() + 1);
     const end = isoDate(next);
     // Assumes creation_Date is a real Date-type column in the sheet.
@@ -378,7 +376,7 @@ function tableToCsvRows(tableId) {
 function downloadCsv() {
   const lines = [];
   lines.push(`Live CT Dashboard export,${new Date().toLocaleString()}`);
-  lines.push(`Filters,City=${currentCity || "All"},Live=${currentLive || "All"},Date=${currentDate || "All"}`);
+  lines.push(`Filters,City=${currentCity || "All"},Store=${currentHub || "All"},Live=${currentLive || "All"},Date=${currentDate || "All"}`);
   lines.push("");
   lines.push("KPI,Value");
   lines.push(`Total orders,${document.getElementById("kpiTotal").textContent}`);
@@ -419,8 +417,12 @@ document.getElementById("filterCity").addEventListener("change", e => { currentC
 document.getElementById("filterHub").addEventListener("change", e => { currentHub = e.target.value; loadDashboard(); });
 document.getElementById("filterLive").addEventListener("change", e => { currentLive = e.target.value; loadDashboard(); });
 document.getElementById("filterDate").addEventListener("change", e => { currentDate = e.target.value; loadDashboard(); });
+document.getElementById("todayBtn").addEventListener("click", () => { currentDate = isoDate(new Date()); document.getElementById("filterDate").value = currentDate; loadDashboard(); });
+document.getElementById("yestBtn").addEventListener("click", () => { const d = new Date(); d.setDate(d.getDate() - 1); currentDate = isoDate(d); document.getElementById("filterDate").value = currentDate; loadDashboard(); });
 document.getElementById("refreshBtn").addEventListener("click", loadDashboard);
 document.getElementById("csvBtn").addEventListener("click", downloadCsv);
+
+document.getElementById("filterDate").value = currentDate;
 
 loadDashboard();
 setInterval(loadDashboard, REFRESH_MS);
