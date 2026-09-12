@@ -42,6 +42,11 @@ body {
   font-size: 13px;
 }
 
+.filters select option {
+  color: #1a1a18;
+  background: #fff;
+}
+
 .filters button {
   cursor: pointer;
   background: rgba(255,255,255,0.15);
@@ -64,6 +69,19 @@ body {
   background: #4ade80;
   box-shadow: 0 0 0 3px rgba(74,222,128,0.25);
 }
+
+.hero-band {
+  background: var(--green);
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  padding: 18px 20px 22px;
+  flex-wrap: wrap;
+}
+
+.hero-stat { text-align: center; }
+.hero-value { color: #fbbf24; font-size: 30px; font-weight: 700; margin: 0; }
+.hero-label { color: #d9f2e2; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; margin: 4px 0 0; }
 
 main {
   padding: 20px;
