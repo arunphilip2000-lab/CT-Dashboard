@@ -263,23 +263,23 @@ function renderHourChart() {
   });
 }
 
-/* Delayed orders by hour (volume of orders with a recorded delay source, per creation hour) */
+/* Delay source split (by category) */
 let delayChart;
 async function loadDelaySplit() {
   const where = buildWhere();
   const extra = where ? `${where} AND ${O.delaySource} IS NOT NULL` : `WHERE ${O.delaySource} IS NOT NULL`;
-  const q = `SELECT ${O.hour}, COUNT(${O.awb}) ${extra} GROUP BY ${O.hour} ORDER BY ${O.hour}`;
+  const q = `SELECT ${O.delaySource}, COUNT(${O.awb}) ${extra} GROUP BY ${O.delaySource} ORDER BY COUNT(${O.awb}) DESC`;
   const table = await gvizQuery(ORDERS_GID, q);
-  const rows = tableRows(table).filter(r => r[0] != null);
+  const rows = tableRows(table);
 
-  const labels = rows.map(r => `${r[0]}:00`);
+  const labels = rows.map(r => r[0] || "Unspecified");
   const values = rows.map(r => r[1] || 0);
 
   const ctx = document.getElementById("delayChart");
   if (delayChart) delayChart.destroy();
   delayChart = new Chart(ctx, {
     type: "bar",
-    data: { labels, datasets: [{ label: "Delayed orders", data: values, backgroundColor: "#14532d", borderRadius: 4 }] },
+    data: { labels, datasets: [{ data: values, backgroundColor: "#d97706", borderRadius: 4 }] },
     options: {
       responsive: true,
       maintainAspectRatio: false,
