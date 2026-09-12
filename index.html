@@ -50,8 +50,14 @@
 
   <section class="chart-row">
     <div class="card">
-      <p class="card-title">Orders &amp; breach % by hour</p>
-      <div class="chart-wrap"><canvas id="hourChart" role="img" aria-label="Line chart of breach percent by hour of day"></canvas></div>
+      <div class="card-header-row">
+        <p class="card-title">Orders &amp; breach % by hour</p>
+        <div class="toggle-group">
+          <button class="toggle-btn active" data-metric="orders">Orders</button>
+          <button class="toggle-btn" data-metric="breaches">Breaches</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="hourChart" role="img" aria-label="Line chart of rider and store delay percent by hour of day"></canvas></div>
     </div>
     <div class="card">
       <p class="card-title">Delay source split</p>
