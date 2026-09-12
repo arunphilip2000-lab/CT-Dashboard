@@ -34,6 +34,7 @@ const R = {
 };
 
 let currentCity = "";
+let currentHub = "";
 let currentLive = "";
 let currentDate = "today"; // "today" | "yesterday" | ""
 let riderLoginCache = null; // reset each refresh so login hours stay current
@@ -87,6 +88,7 @@ function isoDate(d) {
 function buildWhere() {
   const clauses = [];
   if (currentCity) clauses.push(`${O.city} = '${currentCity.replace(/'/g, "\\'")}'`);
+  if (currentHub) clauses.push(`${O.hub} = '${currentHub.replace(/'/g, "\\'")}'`);
   if (currentLive) clauses.push(`${O.liveNonLive} = '${currentLive}'`);
   if (currentDate === "today" || currentDate === "yesterday") {
     const base = new Date();
@@ -140,20 +142,31 @@ function setStatus(text, isError) {
   document.getElementById("liveDot").style.background = isError ? "#dc2626" : "#4ade80";
 }
 
-/* Populate the city dropdown once */
-let cityFilterLoaded = false;
+/* Populate the city and hub dropdowns once */
+let filtersLoaded = false;
 async function loadCityFilter() {
-  if (cityFilterLoaded) return;
-  const table = await gvizQuery(ORDERS_GID, `SELECT ${O.city}, COUNT(${O.awb}) GROUP BY ${O.city} ORDER BY ${O.city}`);
-  const sel = document.getElementById("filterCity");
-  tableRows(table).forEach(([city]) => {
+  if (filtersLoaded) return;
+  const cityTable = await gvizQuery(ORDERS_GID, `SELECT ${O.city}, COUNT(${O.awb}) GROUP BY ${O.city} ORDER BY ${O.city}`);
+  const citySel = document.getElementById("filterCity");
+  tableRows(cityTable).forEach(([city]) => {
     if (!city) return;
     const opt = document.createElement("option");
     opt.value = city;
     opt.textContent = city;
-    sel.appendChild(opt);
+    citySel.appendChild(opt);
   });
-  cityFilterLoaded = true;
+
+  const hubTable = await gvizQuery(ORDERS_GID, `SELECT ${O.hub}, COUNT(${O.awb}) GROUP BY ${O.hub} ORDER BY ${O.hub}`);
+  const hubSel = document.getElementById("filterHub");
+  tableRows(hubTable).forEach(([hub]) => {
+    if (!hub) return;
+    const opt = document.createElement("option");
+    opt.value = hub;
+    opt.textContent = hub;
+    hubSel.appendChild(opt);
+  });
+
+  filtersLoaded = true;
 }
 
 /* Top KPI row */
@@ -403,6 +416,7 @@ function downloadCsv() {
 
 /* ---------- wiring ---------- */
 document.getElementById("filterCity").addEventListener("change", e => { currentCity = e.target.value; loadDashboard(); });
+document.getElementById("filterHub").addEventListener("change", e => { currentHub = e.target.value; loadDashboard(); });
 document.getElementById("filterLive").addEventListener("change", e => { currentLive = e.target.value; loadDashboard(); });
 document.getElementById("filterDate").addEventListener("change", e => { currentDate = e.target.value; loadDashboard(); });
 document.getElementById("refreshBtn").addEventListener("click", loadDashboard);
