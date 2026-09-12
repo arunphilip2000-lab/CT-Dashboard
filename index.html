@@ -45,6 +45,7 @@
     <div class="kpi-card"><p class="kpi-label">Avg accept gap</p><p class="kpi-value" id="kpiAccept">–</p></div>
     <div class="kpi-card"><p class="kpi-label">Avg reach→intent</p><p class="kpi-value" id="kpiIntent">–</p></div>
     <div class="kpi-card"><p class="kpi-label">Active riders today</p><p class="kpi-value" id="kpiRiders">–</p></div>
+    <div class="kpi-card"><p class="kpi-label">New riders today</p><p class="kpi-value" id="kpiNewRiders">–</p></div>
     <div class="kpi-card"><p class="kpi-label">Avg login hours</p><p class="kpi-value" id="kpiLoginHrs">–</p></div>
   </section>
 
@@ -74,8 +75,11 @@
   </section>
 
   <section class="card">
-    <p class="card-title">Hourly report</p>
-    <p class="card-subtitle">Per-store hourly breakdown — select a store above for a single-store report, or leave "All stores" for a citywide/network total. OR2A, S2p not included pending formula confirmation.</p>
+    <div class="card-header-row">
+      <p class="card-title">Hourly report</p>
+      <select id="hourlyReportStore"><option value="">Select a store…</option></select>
+    </div>
+    <p class="card-subtitle">Pick a store above for its hourly breakdown. OR2A, S2p not included pending formula confirmation.</p>
     <div class="table-wrap">
       <table id="hourlyReportTable">
         <thead>
@@ -91,7 +95,7 @@
     <div class="table-wrap">
       <table id="hubTable">
         <thead>
-          <tr><th>Hub</th><th>City</th><th>Orders</th><th>Avg accept gap</th><th>Avg LM (km)</th><th>Breach %</th></tr>
+          <tr><th>Hub</th><th>City</th><th>Orders</th><th>Avg accept gap</th><th>Avg LM (km)</th><th>New riders</th><th>Breach %</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -110,7 +114,10 @@
   </section>
 
   <section class="card">
-    <p class="card-title">Top 5 worst-performing stores per city</p>
+    <div class="card-header-row">
+      <p class="card-title">Top 5 worst-performing stores per city</p>
+      <select id="worstCitySelect"><option value="">Select a city…</option></select>
+    </div>
     <p class="card-subtitle">Ranked by breach %, min 15 orders</p>
     <div class="table-wrap">
       <table id="worstStoresByCityTable">
