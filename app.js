@@ -207,18 +207,37 @@ async function loadKpis() {
   document.getElementById("kpiLoginHrs").textContent = fmtNum(avgLoginHrs);
 }
 
-let hourChart, delayChart;
+let hourChart;
+let hourBarMetric = "orders"; // "orders" | "breaches"
+let lastHourlyData = null; // cached so the toggle can re-render without re-querying
 
-/* Hourly orders + breach % */
+/* Hourly orders + rider/store breach % split */
 async function loadHourly() {
   const where = buildWhere();
-  const q = `SELECT ${O.hour}, COUNT(${O.awb}), COUNT(${O.breach}) ${where} GROUP BY ${O.hour} ORDER BY ${O.hour}`;
-  const table = await gvizQuery(ORDERS_GID, q);
-  const rows = tableRows(table).filter(r => r[0] != null);
+  const totalQ = `SELECT ${O.hour}, COUNT(${O.awb}), COUNT(${O.breach}) ${where} GROUP BY ${O.hour} ORDER BY ${O.hour}`;
+  const totalTable = await gvizQuery(ORDERS_GID, totalQ);
+  const totalRows = tableRows(totalTable).filter(r => r[0] != null);
 
-  const labels = rows.map(r => `${r[0]}:00`);
-  const orders = rows.map(r => r[1] || 0);
-  const breachPct = rows.map(r => (r[1] ? (100 * (r[2] || 0)) / r[1] : 0));
+  const riderWhereExtra = where ? `${where} AND ${O.breach} = 'Breach' AND ${O.delay} = 'Rider_delay'` : `WHERE ${O.breach} = 'Breach' AND ${O.delay} = 'Rider_delay'`;
+  const riderQ = `SELECT ${O.hour}, COUNT(${O.awb}) ${riderWhereExtra} GROUP BY ${O.hour} ORDER BY ${O.hour}`;
+  const riderTable = await gvizQuery(ORDERS_GID, riderQ);
+  const riderMap = new Map(tableRows(riderTable).map(r => [r[0], r[1] || 0]));
+
+  const labels = totalRows.map(r => `${r[0]}:00`);
+  const orders = totalRows.map(r => r[1] || 0);
+  const breachCounts = totalRows.map(r => r[2] || 0);
+  const riderBreachPct = totalRows.map(r => (r[1] ? (100 * (riderMap.get(r[0]) || 0)) / r[1] : 0));
+  const storeBreachPct = totalRows.map((r, i) => (r[1] ? (100 * ((r[2] || 0) - (riderMap.get(r[0]) || 0))) / r[1] : 0));
+
+  lastHourlyData = { labels, orders, breachCounts, riderBreachPct, storeBreachPct };
+  renderHourChart();
+}
+
+function renderHourChart() {
+  if (!lastHourlyData) return;
+  const { labels, orders, breachCounts, riderBreachPct, storeBreachPct } = lastHourlyData;
+  const barData = hourBarMetric === "orders" ? orders : breachCounts;
+  const barLabel = hourBarMetric === "orders" ? "Orders" : "Breaches";
 
   const ctx = document.getElementById("hourChart");
   if (hourChart) hourChart.destroy();
@@ -226,8 +245,9 @@ async function loadHourly() {
     data: {
       labels,
       datasets: [
-        { type: "bar", label: "Orders", data: orders, backgroundColor: "#c7ddd0", yAxisID: "y1", order: 2 },
-        { type: "line", label: "Breach %", data: breachPct, borderColor: "#dc2626", backgroundColor: "#dc2626", tension: 0.3, pointRadius: 3, yAxisID: "y2", order: 1 }
+        { type: "bar", label: barLabel, data: barData, backgroundColor: "#c7ddd0", yAxisID: "y1", order: 3 },
+        { type: "line", label: "Rider delay %", data: riderBreachPct, borderColor: "#dc2626", backgroundColor: "#dc2626", tension: 0.3, pointRadius: 3, yAxisID: "y2", order: 1 },
+        { type: "line", label: "Store delay %", data: storeBreachPct, borderColor: "#d97706", backgroundColor: "#d97706", tension: 0.3, pointRadius: 3, yAxisID: "y2", order: 2 }
       ]
     },
     options: {
@@ -244,6 +264,7 @@ async function loadHourly() {
 }
 
 /* Delay source split */
+let delayChart;
 async function loadDelaySplit() {
   const where = buildWhere();
   const extra = where ? `${where} AND ${O.delaySource} IS NOT NULL` : `WHERE ${O.delaySource} IS NOT NULL`;
@@ -421,6 +442,14 @@ document.getElementById("todayBtn").addEventListener("click", () => { currentDat
 document.getElementById("yestBtn").addEventListener("click", () => { const d = new Date(); d.setDate(d.getDate() - 1); currentDate = isoDate(d); document.getElementById("filterDate").value = currentDate; loadDashboard(); });
 document.getElementById("refreshBtn").addEventListener("click", loadDashboard);
 document.getElementById("csvBtn").addEventListener("click", downloadCsv);
+document.querySelectorAll(".toggle-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    hourBarMetric = btn.dataset.metric;
+    renderHourChart();
+  });
+});
 
 document.getElementById("filterDate").value = currentDate;
 
