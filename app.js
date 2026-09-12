@@ -214,17 +214,25 @@ async function loadKpis() {
   document.getElementById("kpiRiders").textContent = fmtInt(activeRiders);
   document.getElementById("kpiLoginHrs").textContent = fmtNum(avgLoginHrs);
 
-  // New riders today: FOD (first-order-date) on the rider tab equals the
-  // selected date — i.e. their very first working day is this date.
-  const newRiderClauses = [];
-  if (currentDate) newRiderClauses.push(`${R.fod} = date '${currentDate}'`);
-  if (currentCity) newRiderClauses.push(`${R.city} = '${currentCity.replace(/'/g, "\\'")}'`);
-  if (currentHub) newRiderClauses.push(`${R.hub} = '${currentHub.replace(/'/g, "\\'")}'`);
-  const newRiderWhere = newRiderClauses.length ? "WHERE " + newRiderClauses.join(" AND ") : "";
-  const newRiderQ = `SELECT COUNT(${R.riderId}) ${newRiderWhere}`;
-  const newRiderTable = await gvizQuery(RIDER_GID, newRiderQ);
-  const [[newRiderCount = 0] = []] = tableRows(newRiderTable);
-  document.getElementById("kpiNewRiders").textContent = fmtInt(newRiderCount);
+  // "Fresh" riders: their ONLY appearance anywhere in the login sheet is the
+  // selected date — i.e. they never logged in on any other day. This checks
+  // actual login history rather than relying on a separate onboarding-date field.
+  const refDate = currentDate || isoDate(new Date());
+  const scopeClauses = [];
+  if (currentCity) scopeClauses.push(`${R.city} = '${currentCity.replace(/'/g, "\\'")}'`);
+  if (currentHub) scopeClauses.push(`${R.hub} = '${currentHub.replace(/'/g, "\\'")}'`);
+  const scopeExtra = scopeClauses.length ? " AND " + scopeClauses.join(" AND ") : "";
+
+  const todayRidersQ = `SELECT ${R.riderId} WHERE ${R.eventDate} = date '${refDate}'${scopeExtra} GROUP BY ${R.riderId}`;
+  const todayRidersTable = await gvizQuery(RIDER_GID, todayRidersQ);
+  const todayRiderIds = tableRows(todayRidersTable).map(r => String(r[0]));
+
+  const otherRidersQ = `SELECT ${R.riderId} WHERE ${R.eventDate} != date '${refDate}' GROUP BY ${R.riderId}`;
+  const otherRidersTable = await gvizQuery(RIDER_GID, otherRidersQ);
+  const otherRiderSet = new Set(tableRows(otherRidersTable).map(r => String(r[0])));
+
+  const freshRiderIds = todayRiderIds.filter(id => !otherRiderSet.has(id));
+  document.getElementById("kpiNewRiders").textContent = fmtInt(freshRiderIds.length);
 }
 
 let hourChart;
@@ -335,11 +343,21 @@ async function loadHubTable() {
   const table = await gvizQuery(ORDERS_GID, q);
   const rows = tableRows(table);
 
-  // New riders per hub (FOD = selected date), from the rider tab
-  const newRiderWhere = currentDate ? `WHERE ${R.fod} = date '${currentDate}'` : "";
-  const newRiderQ = `SELECT ${R.hub}, COUNT(${R.riderId}) ${newRiderWhere} GROUP BY ${R.hub}`;
-  const newRiderTable = await gvizQuery(RIDER_GID, newRiderQ);
-  const newRiderMap = new Map(tableRows(newRiderTable).map(r => [r[0], r[1] || 0]));
+  // New riders per hub: riders whose only login-sheet appearance anywhere is
+  // the selected date (never logged in on any other day).
+  const refDate = currentDate || isoDate(new Date());
+  const todayPairsQ = `SELECT ${R.hub}, ${R.riderId} WHERE ${R.eventDate} = date '${refDate}' GROUP BY ${R.hub}, ${R.riderId}`;
+  const todayPairsTable = await gvizQuery(RIDER_GID, todayPairsQ);
+  const todayPairs = tableRows(todayPairsTable).map(([hub, riderId]) => [hub, String(riderId)]);
+
+  const otherRidersQ = `SELECT ${R.riderId} WHERE ${R.eventDate} != date '${refDate}' GROUP BY ${R.riderId}`;
+  const otherRidersTable = await gvizQuery(RIDER_GID, otherRidersQ);
+  const otherRiderSet = new Set(tableRows(otherRidersTable).map(r => String(r[0])));
+
+  const newRiderMap = new Map();
+  todayPairs.forEach(([hub, riderId]) => {
+    if (!otherRiderSet.has(riderId)) newRiderMap.set(hub, (newRiderMap.get(hub) || 0) + 1);
+  });
 
   const tbody = document.querySelector("#hubTable tbody");
   tbody.innerHTML = "";
