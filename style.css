@@ -52,6 +52,7 @@ body {
   background: rgba(255,255,255,0.15);
 }
 .filters button:hover { background: rgba(255,255,255,0.25); }
+.filters button.quick-date { font-size: 12px; padding: 6px 8px; }
 
 .status {
   margin-left: auto;
