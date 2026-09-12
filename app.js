@@ -37,6 +37,7 @@ const R = {
 let currentCity = "";
 let currentHub = "";
 let currentLive = "";
+let reportHub = ""; // store selected specifically for the Hourly Report card
 let currentDate = isoDate(new Date()); // "YYYY-MM-DD" from the date picker, or "" for all days
 let riderLoginCache = null; // reset each refresh so login hours stay current
 
@@ -157,12 +158,18 @@ async function loadCityFilter() {
 
   const hubTable = await gvizQuery(ORDERS_GID, `SELECT ${O.hub}, COUNT(${O.awb}) GROUP BY ${O.hub} ORDER BY ${O.hub}`);
   const hubSel = document.getElementById("filterHub");
+  const reportHubSel = document.getElementById("hourlyReportStore");
   tableRows(hubTable).forEach(([hub]) => {
     if (!hub) return;
-    const opt = document.createElement("option");
-    opt.value = hub;
-    opt.textContent = hub;
-    hubSel.appendChild(opt);
+    const opt1 = document.createElement("option");
+    opt1.value = hub;
+    opt1.textContent = hub;
+    hubSel.appendChild(opt1);
+
+    const opt2 = document.createElement("option");
+    opt2.value = hub;
+    opt2.textContent = hub;
+    reportHubSel.appendChild(opt2);
   });
 
   filtersLoaded = true;
@@ -206,6 +213,18 @@ async function loadKpis() {
   const [activeRiders, avgLoginHrs] = riderRow || [];
   document.getElementById("kpiRiders").textContent = fmtInt(activeRiders);
   document.getElementById("kpiLoginHrs").textContent = fmtNum(avgLoginHrs);
+
+  // New riders today: FOD (first-order-date) on the rider tab equals the
+  // selected date — i.e. their very first working day is this date.
+  const newRiderClauses = [];
+  if (currentDate) newRiderClauses.push(`${R.fod} = date '${currentDate}'`);
+  if (currentCity) newRiderClauses.push(`${R.city} = '${currentCity.replace(/'/g, "\\'")}'`);
+  if (currentHub) newRiderClauses.push(`${R.hub} = '${currentHub.replace(/'/g, "\\'")}'`);
+  const newRiderWhere = newRiderClauses.length ? "WHERE " + newRiderClauses.join(" AND ") : "";
+  const newRiderQ = `SELECT COUNT(${R.riderId}) ${newRiderWhere}`;
+  const newRiderTable = await gvizQuery(RIDER_GID, newRiderQ);
+  const [[newRiderCount = 0] = []] = tableRows(newRiderTable);
+  document.getElementById("kpiNewRiders").textContent = fmtInt(newRiderCount);
 }
 
 let hourChart;
@@ -316,13 +335,20 @@ async function loadHubTable() {
   const table = await gvizQuery(ORDERS_GID, q);
   const rows = tableRows(table);
 
+  // New riders per hub (FOD = selected date), from the rider tab
+  const newRiderWhere = currentDate ? `WHERE ${R.fod} = date '${currentDate}'` : "";
+  const newRiderQ = `SELECT ${R.hub}, COUNT(${R.riderId}) ${newRiderWhere} GROUP BY ${R.hub}`;
+  const newRiderTable = await gvizQuery(RIDER_GID, newRiderQ);
+  const newRiderMap = new Map(tableRows(newRiderTable).map(r => [r[0], r[1] || 0]));
+
   const tbody = document.querySelector("#hubTable tbody");
   tbody.innerHTML = "";
   rows.forEach(([hub, city, orders, avgAccept, avgLm, breachCount]) => {
     const pct = orders ? (100 * (breachCount || 0)) / orders : 0;
     const cls = pct > 8 ? "breach-high" : pct > 4 ? "breach-mid" : "";
+    const newRiders = newRiderMap.get(hub) || 0;
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${hub ?? ""}</td><td>${city ?? ""}</td><td>${fmtInt(orders)}</td><td>${fmtNum(avgAccept)}</td><td>${fmtNum(avgLm)}</td><td class="${cls}">${pct.toFixed(1)}%</td>`;
+    tr.innerHTML = `<td>${hub ?? ""}</td><td>${city ?? ""}</td><td>${fmtInt(orders)}</td><td>${fmtNum(avgAccept)}</td><td>${fmtNum(avgLm)}</td><td>${fmtInt(newRiders)}</td><td class="${cls}">${pct.toFixed(1)}%</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -359,6 +385,9 @@ async function loadRiderTable() {
 
 /* Worst-performing stores: overall top 15, and top 5 per city, by breach % (min 15 orders to filter noise) */
 const MIN_ORDERS_FOR_RANKING = 15;
+let worstStoresByCity = null; // cached Map<city, rows[]> so the city dropdown re-renders without re-querying
+let worstCity = "";
+let worstCityDropdownLoaded = false;
 
 async function loadWorstStores() {
   const where = buildWhere();
@@ -375,48 +404,81 @@ async function loadWorstStores() {
   const worstOverall = [...rows].sort((a, b) => b.pct - a.pct).slice(0, 15);
   renderStoreRankTable("worstStoresTable", worstOverall);
 
-  // Worst 5 per city
+  // Worst 5 per city — cached, rendered per the dropdown selection
   const byCity = new Map();
   rows.forEach(r => {
     if (!byCity.has(r.city)) byCity.set(r.city, []);
     byCity.get(r.city).push(r);
   });
-  const worstPerCity = [];
-  [...byCity.keys()].sort().forEach(city => {
-    const top5 = byCity.get(city).sort((a, b) => b.pct - a.pct).slice(0, 5);
-    worstPerCity.push(...top5);
-  });
-  renderStoreRankTable("worstStoresByCityTable", worstPerCity, true);
+  byCity.forEach((list, city) => byCity.set(city, list.sort((a, b) => b.pct - a.pct).slice(0, 5)));
+  worstStoresByCity = byCity;
+
+  if (!worstCityDropdownLoaded) {
+    const sel = document.getElementById("worstCitySelect");
+    [...byCity.keys()].sort().forEach(city => {
+      if (!city) return;
+      const opt = document.createElement("option");
+      opt.value = city;
+      opt.textContent = city;
+      sel.appendChild(opt);
+    });
+    worstCityDropdownLoaded = true;
+  }
+
+  renderWorstStoresByCity();
 }
 
-function renderStoreRankTable(tableId, rows, showCityGroups) {
+function renderWorstStoresByCity() {
+  const tbody = document.querySelector("#worstStoresByCityTable tbody");
+  if (!worstCity || !worstStoresByCity) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color: var(--text-muted); text-align: center; padding: 16px;">Pick a city above to see its worst-performing stores.</td></tr>`;
+    return;
+  }
+  renderStoreRankTable("worstStoresByCityTable", worstStoresByCity.get(worstCity) || []);
+}
+
+function renderStoreRankTable(tableId, rows) {
   const tbody = document.querySelector(`#${tableId} tbody`);
   tbody.innerHTML = "";
-  let lastCity = null;
   rows.forEach(r => {
     const cls = r.pct > 8 ? "breach-high" : r.pct > 4 ? "breach-mid" : "";
     const tr = document.createElement("tr");
-    const cityCell = showCityGroups && r.city !== lastCity ? r.city : (showCityGroups ? "" : r.city);
-    tr.innerHTML = `<td>${r.hub ?? ""}</td><td>${cityCell ?? ""}</td><td>${fmtInt(r.orders)}</td><td class="${cls}">${r.pct.toFixed(1)}%</td>`;
+    tr.innerHTML = `<td>${r.hub ?? ""}</td><td>${r.city ?? ""}</td><td>${fmtInt(r.orders)}</td><td class="${cls}">${r.pct.toFixed(1)}%</td>`;
     tbody.appendChild(tr);
-    lastCity = r.city;
   });
 }
 
-/* Per-store (or all-store) hourly report, joining Projection sheet with actual order data */
+/* Per-store hourly report, joining Projection sheet with actual order data.
+   Driven by its own store dropdown (reportHub), independent of the global
+   city/store filters — only the date and live/non-live filters are shared. */
+function buildReportWhere() {
+  const clauses = [];
+  if (reportHub) clauses.push(`${O.hub} = '${reportHub.replace(/'/g, "\\'")}'`);
+  if (currentLive) clauses.push(`${O.liveNonLive} = '${currentLive}'`);
+  if (currentDate) {
+    const next = new Date(currentDate + "T00:00:00");
+    next.setDate(next.getDate() + 1);
+    clauses.push(`${O.creationDate} >= date '${currentDate}' AND ${O.creationDate} < date '${isoDate(next)}'`);
+  }
+  return clauses.length ? "WHERE " + clauses.join(" AND ") : "";
+}
+
 async function loadHourlyReport() {
-  const where = buildWhere();
+  const tbody = document.querySelector("#hourlyReportTable tbody");
+  if (!reportHub) {
+    tbody.innerHTML = `<tr><td colspan="10" style="color: var(--text-muted); text-align: center; padding: 16px;">Pick a store above to see its hourly report.</td></tr>`;
+    return;
+  }
+  const where = buildReportWhere();
 
   // Projected orders per hour, from the Projection tab (Hub name | city | date | hour | orders)
-  const projClauses = [];
-  if (currentHub) projClauses.push(`A = '${currentHub.replace(/'/g, "\\'")}'`);
-  else if (currentCity) projClauses.push(`B = '${currentCity.replace(/'/g, "\\'")}'`);
+  const projClauses = [`A = '${reportHub.replace(/'/g, "\\'")}'`];
   if (currentDate) {
     const next = new Date(currentDate + "T00:00:00");
     next.setDate(next.getDate() + 1);
     projClauses.push(`C >= date '${currentDate}' AND C < date '${isoDate(next)}'`);
   }
-  const projWhere = projClauses.length ? "WHERE " + projClauses.join(" AND ") : "";
+  const projWhere = "WHERE " + projClauses.join(" AND ");
   const projQ = `SELECT D, SUM(E) ${projWhere} GROUP BY D ORDER BY D`;
   const projTable = await gvizQuery(PROJECTION_GID, projQ);
   const projMap = new Map(tableRows(projTable).map(r => [r[0], r[1] || 0]));
@@ -448,7 +510,6 @@ async function loadHourlyReport() {
   const dauMap = new Map();
   tableRows(riderPairTable).forEach(([hour]) => dauMap.set(hour, (dauMap.get(hour) || 0) + 1));
 
-  const tbody = document.querySelector("#hourlyReportTable tbody");
   tbody.innerHTML = "";
   ALL_HOURS.forEach(hour => {
     const orders = totalMap.get(hour)?.orders || 0;
@@ -534,6 +595,8 @@ function downloadCsv() {
 /* ---------- wiring ---------- */
 document.getElementById("filterCity").addEventListener("change", e => { currentCity = e.target.value; loadDashboard(); });
 document.getElementById("filterHub").addEventListener("change", e => { currentHub = e.target.value; loadDashboard(); });
+document.getElementById("hourlyReportStore").addEventListener("change", e => { reportHub = e.target.value; loadHourlyReport(); });
+document.getElementById("worstCitySelect").addEventListener("change", e => { worstCity = e.target.value; renderWorstStoresByCity(); });
 document.getElementById("filterLive").addEventListener("change", e => { currentLive = e.target.value; loadDashboard(); });
 document.getElementById("filterDate").addEventListener("change", e => { currentDate = e.target.value; loadDashboard(); });
 document.getElementById("todayBtn").addEventListener("click", () => { currentDate = isoDate(new Date()); document.getElementById("filterDate").value = currentDate; loadDashboard(); });
