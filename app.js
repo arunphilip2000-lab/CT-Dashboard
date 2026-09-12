@@ -11,6 +11,7 @@
 const SHEET_ID = "1chF3F2OijqJ2gsW2V6KZFV3V00yNBrVWm0GSWpGIN5E";
 const ORDERS_GID = "1700412129";   // order-level CT tab
 const RIDER_GID = "1570875705";    // rider login / attendance tab
+const PROJECTION_GID = "1665232183"; // Hub name | city | date | hour | orders
 
 const REFRESH_MS = 5 * 60 * 1000;  // dashboard refresh cadence (sheet itself updates ~every 15 min)
 
@@ -119,6 +120,8 @@ async function loadDashboard() {
     await loadKpis();
     setStatus("Loading hourly trend…");
     await loadHourly();
+    setStatus("Loading hourly report…");
+    await loadHourlyReport();
     setStatus("Loading hub table…");
     await loadHubTable();
     setStatus("Loading worst-performing stores…");
@@ -392,6 +395,79 @@ function renderStoreRankTable(tableId, rows, showCityGroups) {
   });
 }
 
+/* Per-store (or all-store) hourly report, joining Projection sheet with actual order data */
+async function loadHourlyReport() {
+  const where = buildWhere();
+
+  // Projected orders per hour, from the Projection tab (Hub name | city | date | hour | orders)
+  const projClauses = [];
+  if (currentHub) projClauses.push(`A = '${currentHub.replace(/'/g, "\\'")}'`);
+  else if (currentCity) projClauses.push(`B = '${currentCity.replace(/'/g, "\\'")}'`);
+  if (currentDate) {
+    const next = new Date(currentDate + "T00:00:00");
+    next.setDate(next.getDate() + 1);
+    projClauses.push(`C >= date '${currentDate}' AND C < date '${isoDate(next)}'`);
+  }
+  const projWhere = projClauses.length ? "WHERE " + projClauses.join(" AND ") : "";
+  const projQ = `SELECT D, SUM(E) ${projWhere} GROUP BY D ORDER BY D`;
+  const projTable = await gvizQuery(PROJECTION_GID, projQ);
+  const projMap = new Map(tableRows(projTable).map(r => [r[0], r[1] || 0]));
+
+  // Actual orders, breach, rider-delay, rider-delay-in-rain per hour
+  const totalQ = `SELECT ${O.hour}, COUNT(${O.awb}), COUNT(${O.breach}) ${where} GROUP BY ${O.hour} ORDER BY ${O.hour}`;
+  const totalTable = await gvizQuery(ORDERS_GID, totalQ);
+  const totalRows = tableRows(totalTable).filter(r => r[0] != null);
+
+  const riderWhereExtra = where ? `${where} AND ${O.breach} = 'Breach' AND ${O.delay} = 'Rider_delay'` : `WHERE ${O.breach} = 'Breach' AND ${O.delay} = 'Rider_delay'`;
+  const riderQ = `SELECT ${O.hour}, COUNT(${O.awb}) ${riderWhereExtra} GROUP BY ${O.hour}`;
+  const riderTable = await gvizQuery(ORDERS_GID, riderQ);
+  const riderMap = new Map(tableRows(riderTable).map(r => [r[0], r[1] || 0]));
+
+  const rainWhereExtra = riderWhereExtra + ` AND ${O.rain} = true`;
+  const rainQ = `SELECT ${O.hour}, COUNT(${O.awb}) ${rainWhereExtra} GROUP BY ${O.hour}`;
+  const rainTable = await gvizQuery(ORDERS_GID, rainQ);
+  const rainMap = new Map(tableRows(rainTable).map(r => [r[0], r[1] || 0]));
+
+  // Avg LM per hour
+  const lmQ = `SELECT ${O.hour}, AVG(${O.lm}) ${where} GROUP BY ${O.hour} ORDER BY ${O.hour}`;
+  const lmTable = await gvizQuery(ORDERS_GID, lmQ);
+  const lmMap = new Map(tableRows(lmTable).map(r => [r[0], r[1]]));
+
+  // Distinct riders per hour (DAU)
+  const riderCountWhere = where ? `${where} AND ${O.riderId} IS NOT NULL` : `WHERE ${O.riderId} IS NOT NULL`;
+  const riderPairQ = `SELECT ${O.hour}, ${O.riderId}, COUNT(${O.awb}) ${riderCountWhere} GROUP BY ${O.hour}, ${O.riderId}`;
+  const riderPairTable = await gvizQuery(ORDERS_GID, riderPairQ);
+  const dauMap = new Map();
+  tableRows(riderPairTable).forEach(([hour]) => dauMap.set(hour, (dauMap.get(hour) || 0) + 1));
+
+  const tbody = document.querySelector("#hourlyReportTable tbody");
+  tbody.innerHTML = "";
+  totalRows.forEach(([hour, orders, breachCount]) => {
+    const projected = projMap.get(hour) || 0;
+    const attainment = projected ? (100 * orders) / projected : null;
+    const dau = dauMap.get(hour) || 0;
+    const oph = dau ? orders / dau : null;
+    const avgLm = lmMap.get(hour);
+    const riderDelayCount = riderMap.get(hour) || 0;
+    const rainDelayCount = rainMap.get(hour) || 0;
+    const storeDelayCount = (breachCount || 0) - riderDelayCount;
+    const riderDelayPct = orders ? (100 * riderDelayCount) / orders : 0;
+    const rainDelayPct = orders ? (100 * rainDelayCount) / orders : 0;
+    const storeDelayPct = orders ? (100 * storeDelayCount) / orders : 0;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${hour}</td><td>${fmtInt(projected)}</td><td>${fmtInt(orders)}</td>` +
+      `<td>${attainment != null ? attainment.toFixed(1) + "%" : "–"}</td>` +
+      `<td>${fmtInt(dau)}</td>` +
+      `<td>${oph != null ? oph.toFixed(2) : "–"}</td>` +
+      `<td>${avgLm != null ? fmtNum(avgLm) : "–"}</td>` +
+      `<td class="${riderDelayPct > 5 ? "breach-high" : ""}">${riderDelayPct.toFixed(1)}%</td>` +
+      `<td>${rainDelayPct.toFixed(2)}%</td>` +
+      `<td class="${storeDelayPct > 5 ? "breach-high" : ""}">${storeDelayPct.toFixed(1)}%</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
 /* ---------- CSV export ---------- */
 function tableToCsvRows(tableId) {
   const table = document.getElementById(tableId);
@@ -418,6 +494,9 @@ function downloadCsv() {
   lines.push(`OTP+3 (approx),${document.getElementById("heroOtp").textContent}`);
   lines.push(`Rider delay %,${document.getElementById("heroRiderDelay").textContent}`);
   lines.push(`Store delay %,${document.getElementById("heroStoreDelay").textContent}`);
+  lines.push("");
+  lines.push("Hourly report");
+  lines.push(...tableToCsvRows("hourlyReportTable"));
   lines.push("");
   lines.push("Hub-level CT and breach");
   lines.push(...tableToCsvRows("hubTable"));
