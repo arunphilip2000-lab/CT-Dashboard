@@ -223,11 +223,11 @@ async function loadKpis() {
   if (currentHub) scopeClauses.push(`${R.hub} = '${currentHub.replace(/'/g, "\\'")}'`);
   const scopeExtra = scopeClauses.length ? " AND " + scopeClauses.join(" AND ") : "";
 
-  const todayRidersQ = `SELECT ${R.riderId} WHERE ${R.eventDate} = date '${refDate}'${scopeExtra} GROUP BY ${R.riderId}`;
+  const todayRidersQ = `SELECT ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} = date '${refDate}'${scopeExtra} GROUP BY ${R.riderId}`;
   const todayRidersTable = await gvizQuery(RIDER_GID, todayRidersQ);
   const todayRiderIds = tableRows(todayRidersTable).map(r => String(r[0]));
 
-  const otherRidersQ = `SELECT ${R.riderId} WHERE ${R.eventDate} != date '${refDate}' GROUP BY ${R.riderId}`;
+  const otherRidersQ = `SELECT ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} != date '${refDate}' GROUP BY ${R.riderId}`;
   const otherRidersTable = await gvizQuery(RIDER_GID, otherRidersQ);
   const otherRiderSet = new Set(tableRows(otherRidersTable).map(r => String(r[0])));
 
@@ -346,11 +346,11 @@ async function loadHubTable() {
   // New riders per hub: riders whose only login-sheet appearance anywhere is
   // the selected date (never logged in on any other day).
   const refDate = currentDate || isoDate(new Date());
-  const todayPairsQ = `SELECT ${R.hub}, ${R.riderId} WHERE ${R.eventDate} = date '${refDate}' GROUP BY ${R.hub}, ${R.riderId}`;
+  const todayPairsQ = `SELECT ${R.hub}, ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} = date '${refDate}' GROUP BY ${R.hub}, ${R.riderId}`;
   const todayPairsTable = await gvizQuery(RIDER_GID, todayPairsQ);
   const todayPairs = tableRows(todayPairsTable).map(([hub, riderId]) => [hub, String(riderId)]);
 
-  const otherRidersQ = `SELECT ${R.riderId} WHERE ${R.eventDate} != date '${refDate}' GROUP BY ${R.riderId}`;
+  const otherRidersQ = `SELECT ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} != date '${refDate}' GROUP BY ${R.riderId}`;
   const otherRidersTable = await gvizQuery(RIDER_GID, otherRidersQ);
   const otherRiderSet = new Set(tableRows(otherRidersTable).map(r => String(r[0])));
 
