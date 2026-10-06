@@ -104,6 +104,21 @@ function buildWhere() {
   return clauses.length ? "WHERE " + clauses.join(" AND ") : "";
 }
 
+/* Convert a login_hours cell to decimal hours. Handles numbers, "8.5", "8:30"
+   (h:mm or h:mm:ss) and gviz time-of-day arrays. Returns null if unreadable. */
+function parseHours(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return v;
+  if (Array.isArray(v)) return (v[0] || 0) + (v[1] || 0) / 60 + (v[2] || 0) / 3600;
+  const str = String(v).trim();
+  if (str.includes(":")) {
+    const [h, m = 0, sec = 0] = str.split(":").map(Number);
+    return h + m / 60 + sec / 3600;
+  }
+  const n = parseFloat(str);
+  return isNaN(n) ? null : n;
+}
+
 /* ---------- Number formatting ---------- */
 const fmtInt = n => (n == null ? "–" : Math.round(n).toLocaleString());
 const fmtPct = n => (n == null ? "–" : (n * 100).toFixed(1) + "%");
@@ -207,11 +222,22 @@ async function loadKpis() {
 
   // Rider tab KPIs — active riders today + avg login hours
   const riderWhere = currentCity ? `WHERE ${R.city} = '${currentCity.replace(/'/g, "\\'")}'` : "";
-  const riderQ = `SELECT COUNT(${R.riderId}), AVG(${R.loginHours}) ${riderWhere}`;
-  const riderTable = await gvizQuery(RIDER_GID, riderQ);
-  const [riderRow] = tableRows(riderTable);
-  const [activeRiders, avgLoginHrs] = riderRow || [];
+  const countTable = await gvizQuery(RIDER_GID, `SELECT COUNT(${R.riderId}) ${riderWhere}`);
+  const [[activeRiders] = []] = tableRows(countTable);
   document.getElementById("kpiRiders").textContent = fmtInt(activeRiders);
+
+  // Avg login hours: try the fast server-side AVG first. If the sheet's
+  // login_hours column isn't purely numeric (e.g. stored as text or h:mm),
+  // Google rejects AVG — so fall back to averaging the raw values here.
+  let avgLoginHrs = null;
+  try {
+    const avgTable = await gvizQuery(RIDER_GID, `SELECT AVG(${R.loginHours}) ${riderWhere}`);
+    [[avgLoginHrs] = []] = tableRows(avgTable);
+  } catch (e) {
+    const rawTable = await gvizQuery(RIDER_GID, `SELECT ${R.loginHours} ${riderWhere}`);
+    const vals = tableRows(rawTable).map(r => parseHours(r[0])).filter(v => v != null);
+    avgLoginHrs = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  }
   document.getElementById("kpiLoginHrs").textContent = fmtNum(avgLoginHrs);
 
   // "Fresh" riders: their ONLY appearance anywhere in the login sheet is the
@@ -382,10 +408,19 @@ async function loadRiderTable() {
   // building a long OR-list per rider (was timing out on large sheets).
   let loginMap = riderLoginCache;
   if (!loginMap) {
-    const loginQ = `SELECT ${R.riderId}, SUM(${R.loginHours}) GROUP BY ${R.riderId}`;
-    const loginTable = await gvizQuery(RIDER_GID, loginQ);
     loginMap = new Map();
-    tableRows(loginTable).forEach(([id, hrs]) => loginMap.set(String(id), hrs));
+    try {
+      const loginTable = await gvizQuery(RIDER_GID, `SELECT ${R.riderId}, SUM(${R.loginHours}) GROUP BY ${R.riderId}`);
+      tableRows(loginTable).forEach(([id, hrs]) => loginMap.set(String(id), hrs));
+    } catch (e) {
+      // login_hours not purely numeric — sum the raw values per rider here instead
+      const rawTable = await gvizQuery(RIDER_GID, `SELECT ${R.riderId}, ${R.loginHours}`);
+      tableRows(rawTable).forEach(([id, hrs]) => {
+        const v = parseHours(hrs);
+        if (v == null) return;
+        loginMap.set(String(id), (loginMap.get(String(id)) || 0) + v);
+      });
+    }
     riderLoginCache = loginMap;
   }
 
