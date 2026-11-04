@@ -1,218 +1,1335 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Live CT Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css?v=5" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'] }
+      }
+    }
+  };
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  body { font-variant-numeric: tabular-nums; }
+  [hidden] { display: none !important; }
+  .seg-on { background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); }
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] .chev { transform: rotate(180deg); }
+  input[type="date"]::-webkit-calendar-picker-indicator { opacity: .5; cursor: pointer; }
+</style>
 </head>
-<body>
 
-<div class="shell">
+<body class="h-full bg-[#f8fafc] font-sans text-slate-700 antialiased">
 
-  <aside class="rail">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Live CT</div>
-    <nav class="nav" id="nav" aria-label="Dashboard views">
-      <button class="nav-item active" data-view="overview">Today at a glance</button>
-      <button class="nav-item" data-view="storehourly">Store by hour</button>
-      <button class="nav-item" data-view="stores">Stores</button>
-      <button class="nav-item" data-view="riders">Riders</button>
-    </nav>
-    <div class="rail-foot">
-      <span id="liveDot" class="live-dot" aria-hidden="true"></span>
+<!-- ============ Sidebar ============ -->
+<aside class="fixed inset-y-0 left-0 z-30 flex w-16 flex-col items-center border-r border-slate-200 bg-white py-4">
+  <div class="mb-5 flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500 text-white" aria-hidden="true">
+    <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18V9m6 9V5m6 13v-6m4 6H3"/></svg>
+  </div>
+
+  <nav id="nav" class="flex flex-col items-center gap-1" aria-label="Dashboard views">
+    <div class="group relative">
+      <button data-view="overview" aria-label="Overview" class="nav-btn flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+      </button>
+      <span class="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition group-hover:opacity-100">Overview</span>
+    </div>
+    <div class="group relative">
+      <button data-view="storehourly" aria-label="Store by hour" class="nav-btn flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+      </button>
+      <span class="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition group-hover:opacity-100">Store by hour</span>
+    </div>
+    <div class="group relative">
+      <button data-view="stores" aria-label="Stores" class="nav-btn flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5 5.6 4h12.8L20 9.5M4 9.5V20h16V9.5M4 9.5h16M9.5 20v-5h5v5"/></svg>
+      </button>
+      <span class="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition group-hover:opacity-100">Stores</span>
+    </div>
+    <div class="group relative">
+      <button data-view="riders" aria-label="Riders" class="nav-btn flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 4.7a3.5 3.5 0 0 1 0 6.6M18 14.6c2 .8 3.5 2.4 3.5 5.4"/></svg>
+      </button>
+      <span class="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition group-hover:opacity-100">Riders</span>
+    </div>
+  </nav>
+
+  <div class="mt-auto flex flex-col items-center gap-1">
+    <div class="group relative">
+      <button id="refreshBtn" aria-label="Refresh data" class="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+      </button>
+      <span class="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition group-hover:opacity-100">Refresh data</span>
+    </div>
+    <div class="group relative">
+      <button id="csvBtn" aria-label="Download CSV" class="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>
+      </button>
+      <span class="pointer-events-none absolute left-12 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition group-hover:opacity-100">Download CSV</span>
+    </div>
+  </div>
+</aside>
+
+<div class="pl-16">
+
+  <!-- ============ Top utility bar ============ -->
+  <header class="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white/85 px-6 py-3 backdrop-blur">
+    <div class="relative w-full max-w-sm flex-1 sm:w-auto">
+      <svg viewBox="0 0 24 24" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4.2"/></svg>
+      <input id="searchInput" list="hubList" type="text" autocomplete="off" placeholder="Search a store and press Enter"
+             class="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-9 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100 invalid:border-rose-300" />
+      <datalist id="hubList"></datalist>
+      <button id="clearStore" hidden aria-label="Clear store" class="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-600">
+        <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+
+    <select id="filterCity" aria-label="City" class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100">
+      <option value="">All cities</option>
+    </select>
+    <select id="filterLive" aria-label="Order type" class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100">
+      <option value="">Live and non-live</option>
+      <option value="Live">Live only</option>
+      <option value="Non Live">Non-live only</option>
+    </select>
+    <input id="filterDate" type="date" aria-label="Date" class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100" />
+    <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm font-medium text-slate-500">
+      <button id="todayBtn" class="rounded-md px-3 py-1.5 transition hover:text-slate-900">Today</button>
+      <button id="yestBtn" class="rounded-md px-3 py-1.5 transition hover:text-slate-900">Yesterday</button>
+    </div>
+
+    <div class="ml-auto flex items-center gap-2 text-xs text-slate-500">
+      <span id="liveDot" class="h-2 w-2 rounded-full bg-emerald-400"></span>
       <span id="statusText" role="status">Loading…</span>
     </div>
-  </aside>
+  </header>
 
-  <div class="main">
+  <main class="mx-auto max-w-[1400px] px-6 py-8">
 
-    <header class="filterbar">
-      <label class="field">
-        <span>City</span>
-        <select id="filterCity"><option value="">All cities</option></select>
-      </label>
-      <label class="field field-wide">
-        <span>Store</span>
-        <input id="filterHub" list="hubList" placeholder="All stores — type to search" autocomplete="off" />
-        <datalist id="hubList"></datalist>
-      </label>
-      <label class="field">
-        <span>Orders</span>
-        <select id="filterLive">
-          <option value="">Live and non-live</option>
-          <option value="Live">Live only</option>
-          <option value="Non Live">Non-live only</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Date</span>
-        <input type="date" id="filterDate" />
-      </label>
-      <div class="quick">
-        <button id="todayBtn" class="btn ghost">Today</button>
-        <button id="yestBtn" class="btn ghost">Yesterday</button>
+    <!-- ============ Overview ============ -->
+    <section id="view-overview">
+      <div class="mb-6">
+        <h1 class="text-xl font-semibold tracking-tight text-slate-900">Overview</h1>
+        <p id="ovSub" class="mt-1 text-sm text-slate-500">Loading the latest numbers from the sheet…</p>
       </div>
-      <div class="actions">
-        <button id="refreshBtn" class="btn">Refresh</button>
-        <button id="csvBtn" class="btn solid">Download CSV</button>
-      </div>
-    </header>
 
-    <main class="content">
-
-      <!-- ===== Today at a glance ===== -->
-      <section class="view" id="view-overview">
-        <h1 class="headline" id="headline">Loading the numbers…</h1>
-        <p class="subhead" id="subhead"></p>
-
-        <div class="kpi-strip">
-          <div class="kpi"><span class="kpi-label">Orders</span><span class="kpi-value" id="kpiTotal">–</span></div>
-          <div class="kpi"><span class="kpi-label">Breach rate</span><span class="kpi-value bad-text" id="kpiBreach">–</span></div>
-          <div class="kpi"><span class="kpi-label">Click to accept (min)</span><span class="kpi-value" id="kpiAccept">–</span></div>
-          <div class="kpi"><span class="kpi-label">Reach to intent (min)</span><span class="kpi-value" id="kpiIntent">–</span></div>
-          <div class="kpi"><span class="kpi-label">Riders logged in</span><span class="kpi-value" id="kpiRiders">–</span></div>
-          <div class="kpi"><span class="kpi-label">First-day riders</span><span class="kpi-value" id="kpiNewRiders">–</span></div>
-          <div class="kpi"><span class="kpi-label">Avg login hours</span><span class="kpi-value" id="kpiLoginHrs">–</span></div>
+      <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Orders</p>
+          <p id="kpiTotal" class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">–</p>
+          <p id="kpiTotalSub" class="mt-1 text-xs text-slate-400">All statuses</p>
         </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Breach rate</p>
+          <p id="kpiBreach" class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">–</p>
+          <p id="kpiBreachSub" class="mt-1 text-xs text-slate-400">Orders past the promised time</p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Rider delay</p>
+          <p id="kpiRider" class="mt-2 text-2xl font-semibold tracking-tight text-indigo-600">–</p>
+          <p class="mt-1 text-xs text-slate-400">Share of orders</p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Store delay</p>
+          <p id="kpiStore" class="mt-2 text-2xl font-semibold tracking-tight text-slate-700">–</p>
+          <p class="mt-1 text-xs text-slate-400">Share of orders</p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Click to accept</p>
+          <p class="mt-2 text-2xl font-semibold tracking-tight text-slate-900"><span id="kpiAccept">–</span><span class="ml-1 text-sm font-medium text-slate-400">min</span></p>
+          <p class="mt-1 text-xs text-slate-400">Average, creation to accept</p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Reach to intent</p>
+          <p class="mt-2 text-2xl font-semibold tracking-tight text-slate-900"><span id="kpiIntent">–</span><span class="ml-1 text-sm font-medium text-slate-400">min</span></p>
+          <p class="mt-1 text-xs text-slate-400">Average, store arrival to intent</p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Riders logged in</p>
+          <p id="kpiRiders" class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">–</p>
+          <p id="kpiRidersSub" class="mt-1 text-xs text-slate-400">From the DAU sheet</p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Average login time</p>
+          <p class="mt-2 text-2xl font-semibold tracking-tight text-slate-900"><span id="kpiLoginHrs">–</span><span class="ml-1 text-sm font-medium text-slate-400">hrs</span></p>
+          <p class="mt-1 text-xs text-slate-400">Per rider, selected day</p>
+        </div>
+      </div>
 
-        <div class="grid-2">
-          <section class="panel">
-            <div class="panel-head">
-              <h2>Delay by hour</h2>
-              <div class="toggle-group" role="group" aria-label="Bar series">
-                <button class="toggle-btn active" data-metric="orders">Orders</button>
-                <button class="toggle-btn" data-metric="breaches">Breaches</button>
-              </div>
+      <div class="mt-4 grid gap-4 lg:grid-cols-3">
+        <section class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5 lg:col-span-2">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-900">Delay by hour</h2>
+              <p class="mt-0.5 text-xs text-slate-500">Rider and store delay as a share of that hour's orders</p>
             </div>
-            <p class="panel-sub">Rider delay and store delay as a share of that hour's orders.</p>
-            <div class="chart-wrap"><canvas id="hourChart" role="img" aria-label="Orders per hour with rider delay and store delay percentages"></canvas></div>
-          </section>
+            <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium text-slate-500" id="hourSeg">
+              <button data-metric="orders" class="seg-btn seg-on rounded-md px-3 py-1.5">Orders</button>
+              <button data-metric="breaches" class="seg-btn rounded-md px-3 py-1.5">Breaches</button>
+            </div>
+          </div>
+          <div class="relative mt-4 h-72"><canvas id="hourChart" role="img" aria-label="Orders per hour with rider delay and store delay percentages"></canvas></div>
+        </section>
 
-          <section class="panel">
-            <div class="panel-head">
-              <h2>Hourly volume</h2>
-              <div class="toggle-group" role="group" aria-label="Volume metric">
-                <button class="toggle-btn vol-toggle active" data-vol-metric="orders">Orders</button>
-                <button class="toggle-btn vol-toggle" data-vol-metric="riders">Riders</button>
-                <button class="toggle-btn vol-toggle" data-vol-metric="breaches">Breaches</button>
-              </div>
+        <section class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-900">Hourly volume</h2>
+              <p id="volSub" class="mt-0.5 text-xs text-slate-500">Orders by creation hour</p>
             </div>
-            <p class="panel-sub" id="volSub">Orders by creation hour.</p>
-            <div class="chart-wrap"><canvas id="volumeChart" role="img" aria-label="Hourly volume of orders, riders or breaches"></canvas></div>
-          </section>
+            <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium text-slate-500" id="volSeg">
+              <button data-vol-metric="orders" class="seg-btn seg-on rounded-md px-2.5 py-1.5">Orders</button>
+              <button data-vol-metric="riders" class="seg-btn rounded-md px-2.5 py-1.5">Riders</button>
+              <button data-vol-metric="breaches" class="seg-btn rounded-md px-2.5 py-1.5">Breaches</button>
+            </div>
+          </div>
+          <div class="relative mt-4 h-72"><canvas id="volumeChart" role="img" aria-label="Hourly volume of orders, riders or breaches"></canvas></div>
+        </section>
+      </div>
+
+      <section class="mt-4 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
+        <div class="flex items-center justify-between px-6 py-5">
+          <div>
+            <h2 class="text-sm font-semibold text-slate-900">Store performance</h2>
+            <p id="hubCount" class="mt-0.5 text-xs text-slate-500">The 20 busiest stores for the current filters. Select a store to see it hour by hour.</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table id="hubTable" class="w-full text-sm">
+            <thead>
+              <tr class="border-y border-slate-100 bg-slate-50/70 text-xs font-medium text-slate-500">
+                <th class="px-6 py-3 text-left font-medium">Store</th>
+                <th class="px-4 py-3 text-right font-medium">Orders</th>
+                <th class="px-4 py-3 text-right font-medium">Breach</th>
+                <th class="px-4 py-3 text-right font-medium">Rider delay</th>
+                <th class="px-4 py-3 text-right font-medium">Store delay</th>
+                <th class="px-4 py-3 text-right font-medium">Click to accept</th>
+                <th class="px-4 py-3 text-right font-medium">Avg last mile</th>
+                <th class="px-4 py-3 text-right font-medium">First-day riders</th>
+                <th class="px-6 py-3 text-left font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100"></tbody>
+          </table>
         </div>
       </section>
 
-      <!-- ===== Store by hour ===== -->
-      <section class="view" id="view-storehourly" hidden>
-        <div class="store-head">
-          <div>
-            <h1 class="headline" id="shTitle">Choose a store</h1>
-            <p class="subhead" id="shSub">Pick a store in the filter bar to see its orders against projection, hour by hour.</p>
+      <details id="dataCheck" class="group mt-4 rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
+        <summary class="flex cursor-pointer items-center justify-between px-6 py-4">
+          <span>
+            <span class="text-sm font-semibold text-slate-900">Data check</span>
+            <span class="ml-2 text-xs text-slate-500">Row counts straight from the sheet, to compare with what you see</span>
+          </span>
+          <svg viewBox="0 0 24 24" class="chev h-4 w-4 text-slate-400 transition" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="border-t border-slate-100 px-6 py-5">
+          <dl class="grid grid-cols-2 gap-x-6 gap-y-5 text-sm md:grid-cols-4">
+            <div><dt class="text-xs text-slate-500">Rows in Base Dump</dt><dd id="dcTotal" class="mt-1 font-semibold text-slate-900">–</dd></div>
+            <div><dt class="text-xs text-slate-500">Rows on the selected date</dt><dd id="dcDay" class="mt-1 font-semibold text-slate-900">–</dd></div>
+            <div><dt class="text-xs text-slate-500">Rows with no readable creation date</dt><dd id="dcNoDate" class="mt-1 font-semibold text-slate-900">–</dd></div>
+            <div><dt class="text-xs text-slate-500">Dates present</dt><dd id="dcRange" class="mt-1 font-semibold text-slate-900">–</dd></div>
+            <div><dt class="text-xs text-slate-500">Rows in DAU (all dates)</dt><dd id="dcDau" class="mt-1 font-semibold text-slate-900">–</dd></div>
+            <div><dt class="text-xs text-slate-500">DAU rows on the selected date</dt><dd id="dcDauDay" class="mt-1 font-semibold text-slate-900">–</dd></div>
+            <div><dt class="text-xs text-slate-500">Breached orders with no delay owner</dt><dd id="dcOwner" class="mt-1 font-semibold text-slate-900">–</dd></div>
+            <div><dt class="text-xs text-slate-500">Checked</dt><dd id="dcWhen" class="mt-1 font-semibold text-slate-900">–</dd></div>
+          </dl>
+          <p id="dcNote" class="mt-5 max-w-3xl text-xs leading-relaxed text-slate-500"></p>
+        </div>
+      </details>
+    </section>
+
+    <!-- ============ Store by hour ============ -->
+    <section id="view-storehourly" hidden>
+      <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 id="shTitle" class="text-xl font-semibold tracking-tight text-slate-900">Store by hour</h1>
+          <p id="shSub" class="mt-1 text-sm text-slate-500">Search for a store in the top bar to see its orders against projection, hour by hour.</p>
+        </div>
+        <button id="shPick" class="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-600">Search for a store</button>
+      </div>
+
+      <div id="shMetrics" hidden class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Orders vs projection</p>
+          <p id="shAttain" class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">–</p>
+          <p id="shAttainSub" class="mt-1 text-xs text-slate-400"></p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Click to accept</p>
+          <p class="mt-2 text-2xl font-semibold tracking-tight text-slate-900"><span id="shO2a">–</span><span class="ml-1 text-sm font-medium text-slate-400">min</span></p>
+          <p class="mt-1 text-xs text-slate-400">Order-weighted average</p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Store to pickup (S2P)</p>
+          <p class="mt-2 text-2xl font-semibold tracking-tight text-slate-900"><span id="shS2p">–</span><span class="ml-1 text-sm font-medium text-slate-400">min</span></p>
+          <p class="mt-1 text-xs text-slate-400">Bags packed to picked up</p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Rider delay</p>
+          <p id="shRider" class="mt-2 text-2xl font-semibold tracking-tight text-indigo-600">–</p>
+          <p class="mt-1 text-xs text-slate-400">Share of orders</p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Store delay</p>
+          <p id="shStore" class="mt-2 text-2xl font-semibold tracking-tight text-slate-700">–</p>
+          <p class="mt-1 text-xs text-slate-400">Share of orders</p>
+        </div>
+      </div>
+
+      <section id="shChartPanel" hidden class="mt-4 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+        <h2 class="text-sm font-semibold text-slate-900">Orders against projection</h2>
+        <p class="mt-0.5 text-xs text-slate-500">Bars are orders placed in each hour. The line is what was projected.</p>
+        <div class="relative mt-4 h-72"><canvas id="projChart" role="img" aria-label="Actual orders against projected orders by hour"></canvas></div>
+      </section>
+
+      <section class="mt-4 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
+        <div class="overflow-x-auto">
+          <table id="hourlyReportTable" class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-100 bg-slate-50/70 text-xs font-medium text-slate-500">
+                <th class="px-6 py-3 text-left font-medium">Hour</th>
+                <th class="px-4 py-3 text-right font-medium">Projected</th>
+                <th class="px-4 py-3 text-right font-medium">Orders</th>
+                <th class="px-4 py-3 text-right font-medium">Attainment</th>
+                <th class="px-4 py-3 text-right font-medium">Riders</th>
+                <th class="px-4 py-3 text-right font-medium">Orders per rider</th>
+                <th class="px-4 py-3 text-right font-medium">Click to accept</th>
+                <th class="px-4 py-3 text-right font-medium">S2P</th>
+                <th class="px-4 py-3 text-right font-medium">Avg last mile</th>
+                <th class="px-4 py-3 text-right font-medium">Rider delay</th>
+                <th class="px-4 py-3 text-right font-medium">Rider delay (rain)</th>
+                <th class="px-6 py-3 text-right font-medium">Store delay</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </section>
+      <p id="shNote" class="mt-3 max-w-4xl text-xs leading-relaxed text-slate-500"></p>
+    </section>
+
+    <!-- ============ Stores ============ -->
+    <section id="view-stores" hidden>
+      <div class="mb-6">
+        <h1 class="text-xl font-semibold tracking-tight text-slate-900">Stores</h1>
+        <p class="mt-1 text-sm text-slate-500">Where breaches are concentrated. Stores with fewer than 15 orders are left out of the rankings.</p>
+      </div>
+
+      <div class="grid gap-4 xl:grid-cols-2">
+        <section class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
+          <div class="px-6 py-5">
+            <h2 class="text-sm font-semibold text-slate-900">15 weakest stores</h2>
+            <p class="mt-0.5 text-xs text-slate-500">Highest breach rate for the current filters</p>
           </div>
-          <button class="btn solid" id="shPick" hidden>Choose a store</button>
-        </div>
-
-        <div class="kpi-strip" id="shMetrics" hidden>
-          <div class="kpi"><span class="kpi-label">Orders vs projection</span><span class="kpi-value" id="shAttain">–</span><span class="kpi-sub" id="shAttainSub"></span></div>
-          <div class="kpi"><span class="kpi-label">Click to accept (min)</span><span class="kpi-value" id="shO2a">–</span></div>
-          <div class="kpi"><span class="kpi-label">Store to pickup, S2P (min)</span><span class="kpi-value" id="shS2p">–</span></div>
-          <div class="kpi"><span class="kpi-label">Rider delay</span><span class="kpi-value" id="shRider">–</span></div>
-          <div class="kpi"><span class="kpi-label">Store delay</span><span class="kpi-value" id="shStore">–</span></div>
-        </div>
-
-        <section class="panel" id="shChartPanel" hidden>
-          <div class="panel-head"><h2>Orders against projection</h2></div>
-          <p class="panel-sub">Bars are orders placed in each hour. The line is what was projected for that hour.</p>
-          <div class="chart-wrap tall"><canvas id="projChart" role="img" aria-label="Actual orders against projected orders by hour"></canvas></div>
-        </section>
-
-        <section class="panel flush">
-          <div class="table-wrap">
-            <table id="hourlyReportTable" class="grid">
+          <div class="overflow-x-auto">
+            <table id="worstStoresTable" class="w-full text-sm">
               <thead>
-                <tr>
-                  <th>Hour</th><th>Projected</th><th>Orders</th><th class="att-col">Attainment</th><th>Riders</th><th>Orders per rider</th>
-                  <th>Click to accept</th><th>S2P</th><th>Avg LM (km)</th><th>Rider delay</th><th>Rider delay (rain)</th><th>Store delay</th>
+                <tr class="border-y border-slate-100 bg-slate-50/70 text-xs font-medium text-slate-500">
+                  <th class="px-6 py-3 text-left font-medium">Store</th>
+                  <th class="px-4 py-3 text-right font-medium">Orders</th>
+                  <th class="px-4 py-3 text-right font-medium">Breach</th>
+                  <th class="px-6 py-3 text-left font-medium">Status</th>
                 </tr>
               </thead>
-              <tbody></tbody>
+              <tbody class="divide-y divide-slate-100"></tbody>
             </table>
           </div>
         </section>
-        <p class="note" id="shNote"></p>
-      </section>
 
-      <!-- ===== Stores ===== -->
-      <section class="view" id="view-stores" hidden>
-        <section class="panel flush">
-          <div class="panel-head pad">
-            <h2>Busiest stores</h2>
+        <section class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
+          <div class="flex items-center justify-between gap-3 px-6 py-5">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-900">5 weakest in a city</h2>
+              <p class="mt-0.5 text-xs text-slate-500">Highest breach rate within the city you choose</p>
+            </div>
+            <select id="worstCitySelect" aria-label="City" class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100">
+              <option value="">Choose a city</option>
+            </select>
           </div>
-          <p class="panel-sub pad">Top 20 by orders for the current filters, with rider and store delay kept separate.</p>
-          <div class="table-wrap">
-            <table id="hubTable" class="grid">
+          <div class="overflow-x-auto">
+            <table id="worstStoresByCityTable" class="w-full text-sm">
               <thead>
-                <tr><th class="left">Store</th><th class="left">City</th><th>Orders</th><th>Breach</th><th>Rider delay</th><th>Store delay</th><th>Click to accept</th><th>Avg LM (km)</th><th>First-day riders</th></tr>
+                <tr class="border-y border-slate-100 bg-slate-50/70 text-xs font-medium text-slate-500">
+                  <th class="px-6 py-3 text-left font-medium">Store</th>
+                  <th class="px-4 py-3 text-right font-medium">Orders</th>
+                  <th class="px-4 py-3 text-right font-medium">Breach</th>
+                  <th class="px-6 py-3 text-left font-medium">Status</th>
+                </tr>
               </thead>
-              <tbody></tbody>
+              <tbody class="divide-y divide-slate-100"></tbody>
             </table>
           </div>
         </section>
+      </div>
+    </section>
 
-        <div class="grid-2">
-          <section class="panel flush">
-            <div class="panel-head pad"><h2>15 weakest stores</h2></div>
-            <p class="panel-sub pad">Highest breach rate across the network. Stores with fewer than 15 orders are left out.</p>
-            <div class="table-wrap">
-              <table id="worstStoresTable" class="grid">
-                <thead><tr><th class="left">Store</th><th class="left">City</th><th>Orders</th><th>Breach</th></tr></thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </section>
-
-          <section class="panel flush">
-            <div class="panel-head pad">
-              <h2>5 weakest in a city</h2>
-              <select id="worstCitySelect" aria-label="City"><option value="">Choose a city</option></select>
-            </div>
-            <p class="panel-sub pad">Highest breach rate within the city you choose.</p>
-            <div class="table-wrap">
-              <table id="worstStoresByCityTable" class="grid">
-                <thead><tr><th class="left">Store</th><th class="left">City</th><th>Orders</th><th>Breach</th></tr></thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </section>
+    <!-- ============ Riders ============ -->
+    <section id="view-riders" hidden>
+      <div class="mb-6">
+        <h1 class="text-xl font-semibold tracking-tight text-slate-900">Riders</h1>
+        <p class="mt-1 text-sm text-slate-500">The 25 riders with the most orders for the current filters. Login time comes from the DAU sheet for the selected day.</p>
+      </div>
+      <section class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
+        <div class="overflow-x-auto">
+          <table id="riderTable" class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-100 bg-slate-50/70 text-xs font-medium text-slate-500">
+                <th class="px-6 py-3 text-left font-medium">Rider</th>
+                <th class="px-4 py-3 text-left font-medium">Store</th>
+                <th class="px-4 py-3 text-right font-medium">Orders</th>
+                <th class="px-4 py-3 text-right font-medium">Click to accept</th>
+                <th class="px-4 py-3 text-right font-medium">Reach to intent</th>
+                <th class="px-4 py-3 text-right font-medium">Breach</th>
+                <th class="px-4 py-3 text-right font-medium">Login time</th>
+                <th class="px-6 py-3 text-left font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100"></tbody>
+          </table>
         </div>
       </section>
+      <p id="riderNote" class="mt-3 max-w-4xl text-xs leading-relaxed text-slate-500"></p>
+    </section>
 
-      <!-- ===== Riders ===== -->
-      <section class="view" id="view-riders" hidden>
-        <section class="panel flush">
-          <div class="panel-head pad"><h2>Riders with the most orders</h2></div>
-          <p class="panel-sub pad">Top 25 for the current filters. Login hours come from the rider login sheet.</p>
-          <div class="table-wrap">
-            <table id="riderTable" class="grid">
-              <thead>
-                <tr><th class="left">Rider</th><th class="left">Store</th><th>Orders</th><th>Click to accept</th><th>Reach to intent</th><th>Breach</th><th>Login hours</th></tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
-        <p class="note" id="riderNote"></p>
-      </section>
-
-    </main>
-  </div>
+  </main>
 </div>
 
-<script src="app.js?v=5"></script>
+<script>
+/* ============================================================
+   LIVE CT DASHBOARD
+   Reads straight from the Google Sheet through Google's built-in
+   "gviz" query endpoint. No Apps Script, no backend: a static page.
+   The spreadsheet must be shared as "Anyone with the link -> Viewer".
+   ============================================================ */
+
+const SHEET_ID = "1chF3F2OijqJ2gsW2V6KZFV3V00yNBrVWm0GSWpGIN5E";
+const ORDERS_GID = "1700412129";      // Base Dump: one row per order
+const RIDER_GID = "1570875705";       // DAU: rider login / attendance
+const PROJECTION_GID = "1665232183";  // Projection: Hub name | city | date | hour | orders
+
+const REFRESH_MS = 5 * 60 * 1000;
+const QUERY_TIMEOUT_MS = 60000;
+
+/* Cut-offs for the status pills. Edit to match your SLA targets. */
+const TARGETS = {
+  breachWatch: 4, breachBad: 8,   // store / rider breach rate, % of orders
+  delayWarn: 3, delayBad: 5,      // rider / store delay, % of orders
+  o2aGood: 0.35, o2aWarn: 0.5,    // click to accept, minutes
+  s2pGood: 0.75, s2pWarn: 1.0,    // store to pickup, minutes
+  attainGood: 90, attainWarn: 70  // orders as % of projection
+};
+
+/* Base Dump columns */
+const O = {
+  awb: "A", hub: "C", status: "D", riderId: "E", name: "F", creationDate: "G",
+  pickedTime: "J", city: "O", breach: "R", bagsPacked: "S", lm: "T",
+  creationToAccept: "X", hour: "Y", reachToIntent: "AA", rain: "AB",
+  delay: "AC", liveNonLive: "AD"
+};
+/* DAU (rider login) columns */
+const R = { eventDate: "A", city: "B", hub: "C", riderId: "D", loginHours: "G" };
+
+const BREACHED = `${O.breach} = 'Breach'`;
+
+/* ---------- state ---------- */
+const ALL_HOURS = Array.from({ length: 24 }, (_, i) => i);
+let currentCity = "", currentHub = "", currentLive = "";
+let currentDate = isoDate(new Date());
+let activeView = "overview";
+const loadedViews = {};
+let knownHubs = new Set();
+let hourlyData = null, ridersByHour = null;
+let hourBarMetric = "orders", volMetric = "orders";
+let hourChart, volumeChart, projChart;
+let lastBreachSplit = null;
+
+/* Every filter change bumps the epoch. A query that finishes after a newer
+   filter was chosen is dropped, so an old answer can never overwrite a new one. */
+let epoch = 0;
+class StaleError extends Error {}
+
+/* ---------- gviz helper (JSONP, works from a static page) ---------- */
+function gvizQuery(gid, query) {
+  const myEpoch = epoch;
+  return new Promise((resolve, reject) => {
+    const cb = "gviz_cb_" + Math.random().toString(36).slice(2);
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("The sheet took too long to answer. Check that link sharing is still on."));
+    }, QUERY_TIMEOUT_MS);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cb];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cb] = resp => {
+      cleanup();
+      if (myEpoch !== epoch) { reject(new StaleError("stale")); return; }
+      if (resp.status === "error") {
+        const msg = resp.errors?.[0]?.detailed_message || resp.errors?.[0]?.message || "Query error";
+        reject(new Error(msg + " | query: " + query));
+        return;
+      }
+      resolve(resp.table);
+    };
+
+    const url =
+      `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq` +
+      `?gid=${gid}&headers=1&tqx=out:json;responseHandler:${cb}` +
+      `&tq=${encodeURIComponent(query)}&_=${Date.now()}`;
+
+    const script = document.createElement("script");
+    script.src = url;
+    script.onerror = () => { cleanup(); reject(new Error("Could not reach the sheet. Is link sharing on?")); };
+    document.body.appendChild(script);
+  });
+}
+
+const tableRows = table => table.rows.map(r => r.c.map(c => (c ? c.v : null)));
+
+/* ---------- helpers ---------- */
+function isoDate(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+const sq = s => String(s).replace(/'/g, "\\'");
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const fmtInt = n => (n == null ? "–" : Math.round(n).toLocaleString("en-IN"));
+const fmtPct = n => (n == null ? "–" : (n * 100).toFixed(1) + "%");
+const fmtNum = (n, d = 2) => (n == null || isNaN(n) ? "–" : Number(n).toFixed(d));
+
+function dateClause(col, dateStr) {
+  const next = new Date(dateStr + "T00:00:00");
+  next.setDate(next.getDate() + 1);
+  return `${col} >= date '${dateStr}' AND ${col} < date '${isoDate(next)}'`;
+}
+const withClause = (where, extra) => (where ? `${where} AND ${extra}` : `WHERE ${extra}`);
+
+function buildWhere() {
+  const c = [];
+  if (currentCity) c.push(`${O.city} = '${sq(currentCity)}'`);
+  if (currentHub) c.push(`${O.hub} = '${sq(currentHub)}'`);
+  if (currentLive) c.push(`${O.liveNonLive} = '${sq(currentLive)}'`);
+  if (currentDate) c.push(dateClause(O.creationDate, currentDate));
+  return c.length ? "WHERE " + c.join(" AND ") : "";
+}
+
+/* The store-by-hour page ignores the city filter: a store belongs to one city. */
+function buildStoreWhere() {
+  const c = [`${O.hub} = '${sq(currentHub)}'`];
+  if (currentLive) c.push(`${O.liveNonLive} = '${sq(currentLive)}'`);
+  c.push(dateClause(O.creationDate, currentDate || isoDate(new Date())));
+  return "WHERE " + c.join(" AND ");
+}
+
+/* The same filters applied to the DAU tab, so rider numbers match the order numbers. */
+function buildRiderWhere(extra) {
+  const c = [];
+  if (currentDate) c.push(dateClause(R.eventDate, currentDate));
+  if (currentCity) c.push(`${R.city} = '${sq(currentCity)}'`);
+  if (currentHub) c.push(`${R.hub} = '${sq(currentHub)}'`);
+  if (extra) c.push(extra);
+  return c.length ? "WHERE " + c.join(" AND ") : "";
+}
+
+function datePhrase(d = currentDate) {
+  if (!d) return "across all days";
+  const today = isoDate(new Date());
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  if (d === today) return "today";
+  if (d === isoDate(y)) return "yesterday";
+  return "on " + new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+/* login_hours may arrive as a number, "8:30", a time-of-day array, or "Date(1899,11,30,8,30,0)". */
+function parseHours(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return v;
+  if (Array.isArray(v)) return (v[0] || 0) + (v[1] || 0) / 60 + (v[2] || 0) / 3600;
+  const str = String(v).trim();
+  const d = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?/.exec(str);
+  if (d) return +d[1] !== 1899 ? null : (+d[4] || 0) + (+d[5] || 0) / 60 + (+d[6] || 0) / 3600;
+  if (str.includes(":")) {
+    const [h, m = 0, s = 0] = str.split(":").map(Number);
+    return h + m / 60 + s / 3600;
+  }
+  const n = parseFloat(str);
+  return isNaN(n) ? null : n;
+}
+
+/* Timestamp cell -> { ms, hasTime }. gviz sends dates as "Date(y,m,d,h,mi,s)". */
+function parseTs(v) {
+  if (v == null || v === "") return null;
+  if (v instanceof Date) return { ms: v.getTime(), hasTime: true };
+  if (typeof v !== "string") return null;
+  const m = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+)(?:,(\d+))?)?\)$/.exec(v);
+  if (m) {
+    return {
+      ms: Date.UTC(+m[1], +m[2], +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0), +(m[7] || 0)),
+      hasTime: m[4] != null
+    };
+  }
+  const t = Date.parse(v);
+  return isNaN(t) ? null : { ms: t, hasTime: /\d:\d/.test(v) };
+}
+
+const isTrue = v => v === true || String(v).toLowerCase() === "true";
+
+async function safe(fn, fallback) {
+  try { return await fn(); } catch (e) { if (e instanceof StaleError) throw e; console.warn(e); return fallback; }
+}
+
+function setStatus(text, isError) {
+  $("statusText").textContent = text;
+  $("liveDot").className = "h-2 w-2 rounded-full " + (isError ? "bg-rose-400" : "bg-emerald-400");
+}
+
+/* Breach rows split by the Delay column: Rider_delay, Store_delay, or neither. */
+function splitBreaches(rows) {
+  const s = { rider: 0, store: 0, other: 0 };
+  rows.forEach(([key, n]) => {
+    if (key === "Rider_delay") s.rider += n || 0;
+    else if (key === "Store_delay") s.store += n || 0;
+    else s.other += n || 0;
+  });
+  return s;
+}
+
+/* ---------- status pills ---------- */
+const PILL = {
+  good: "bg-emerald-50 text-emerald-700 ring-emerald-600/15",
+  warn: "bg-amber-50 text-amber-700 ring-amber-600/20",
+  bad: "bg-rose-50 text-rose-700 ring-rose-600/15",
+  none: "bg-slate-100 text-slate-500 ring-slate-500/10"
+};
+const DOT = { good: "bg-emerald-500", warn: "bg-amber-500", bad: "bg-rose-500", none: "bg-slate-400" };
+const chip = (kind, text) =>
+  `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${PILL[kind]}">${text}</span>`;
+const status = (kind, text) =>
+  `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${PILL[kind]}"><span class="h-1.5 w-1.5 rounded-full ${DOT[kind]}"></span>${text}</span>`;
+
+const kindO2a = v => (v == null ? "none" : v <= TARGETS.o2aGood ? "good" : v <= TARGETS.o2aWarn ? "warn" : "bad");
+const kindS2p = v => (v == null ? "none" : v <= TARGETS.s2pGood ? "good" : v <= TARGETS.s2pWarn ? "warn" : "bad");
+const kindDelay = p => (p < TARGETS.delayWarn ? "good" : p < TARGETS.delayBad ? "warn" : "bad");
+const kindAttain = p => (p >= TARGETS.attainGood ? "good" : p >= TARGETS.attainWarn ? "warn" : "bad");
+const kindBreach = p => (p <= TARGETS.breachWatch ? "good" : p <= TARGETS.breachBad ? "warn" : "bad");
+const breachLabel = p => (p <= TARGETS.breachWatch ? "On track" : p <= TARGETS.breachBad ? "Watch" : "Breaching");
+
+/* ---------- table cells ---------- */
+const TDL = "px-6 py-4 text-left text-slate-700";
+const TD = "px-4 py-4 text-right text-slate-600";
+const TDR = "px-6 py-4 text-right text-slate-600";
+const storeLink = hub =>
+  `<button class="store-link text-left font-medium text-slate-900 transition hover:text-indigo-600" data-hub="${esc(hub)}">${esc(hub)}</button>`;
+
+function emptyRow(tableId, cols, text) {
+  document.querySelector(`#${tableId} tbody`).innerHTML =
+    `<tr><td colspan="${cols}" class="px-6 py-12 text-center text-sm text-slate-400" data-empty="1">${text}</td></tr>`;
+}
+
+function setSeg(groupId, btn) {
+  document.querySelectorAll(`#${groupId} .seg-btn`).forEach(b => b.classList.toggle("seg-on", b === btn));
+}
+
+/* ============================================================
+   VIEWS
+   ============================================================ */
+const VIEW_LOADERS = {
+  overview: async () => { await loadKpis(); await loadHourly(); await loadHubTable(); },
+  storehourly: loadStoreHourly,
+  stores: loadWorstStores,
+  riders: loadRiderTable
+};
+
+async function loadActiveView(force) {
+  if (!force && loadedViews[activeView]) return;
+  setStatus("Loading…");
+  try {
+    await safe(loadFilters, null);
+    await VIEW_LOADERS[activeView]();
+    loadedViews[activeView] = true;
+    setStatus("Updated " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+  } catch (err) {
+    if (err instanceof StaleError) return;
+    console.error(err);
+    setStatus("Error: " + err.message, true);
+  }
+}
+
+function resetData() {
+  epoch++;
+  Object.keys(loadedViews).forEach(k => delete loadedViews[k]);
+  ridersByHour = null;
+  if ($("dataCheck").open) loadDataCheck();
+}
+function invalidate() { resetData(); loadActiveView(true); }
+
+function showView(name) {
+  activeView = name;
+  ["overview", "storehourly", "stores", "riders"].forEach(v => { $("view-" + v).hidden = v !== name; });
+  document.querySelectorAll(".nav-btn").forEach(b => {
+    const on = b.dataset.view === name;
+    b.classList.toggle("bg-indigo-50", on);
+    b.classList.toggle("text-indigo-600", on);
+    b.classList.toggle("text-slate-400", !on);
+  });
+  loadActiveView(false);
+}
+
+function selectStore(hub) {
+  currentHub = hub;
+  $("searchInput").value = hub;
+  $("searchInput").setCustomValidity("");
+  $("clearStore").hidden = !hub;
+  resetData();
+  showView("storehourly");
+}
+
+let filtersLoaded = false;
+async function loadFilters() {
+  if (filtersLoaded) return;
+  const cities = await gvizQuery(ORDERS_GID, `SELECT ${O.city}, COUNT(${O.awb}) GROUP BY ${O.city} ORDER BY ${O.city}`);
+  const citySel = $("filterCity");
+  tableRows(cities).forEach(([city]) => {
+    if (!city) return;
+    const o = document.createElement("option");
+    o.value = o.textContent = city;
+    citySel.appendChild(o);
+  });
+  const hubs = await gvizQuery(ORDERS_GID, `SELECT ${O.hub}, COUNT(${O.awb}) GROUP BY ${O.hub} ORDER BY ${O.hub}`);
+  const list = $("hubList");
+  tableRows(hubs).forEach(([hub]) => {
+    if (!hub) return;
+    knownHubs.add(hub);
+    const o = document.createElement("option");
+    o.value = hub;
+    list.appendChild(o);
+  });
+  filtersLoaded = true;
+}
+
+/* ============================================================
+   OVERVIEW
+   ============================================================ */
+async function loadKpis() {
+  const where = buildWhere();
+  const main = await gvizQuery(ORDERS_GID,
+    `SELECT COUNT(${O.awb}), COUNT(${O.breach}), AVG(${O.creationToAccept}), AVG(${O.reachToIntent}) ${where}`);
+  const [[total = 0, breachCount = 0, avgAccept, avgIntent] = []] = tableRows(main);
+
+  /* One query gives the owner of every breach: Rider_delay, Store_delay, or blank. */
+  const ownerT = await gvizQuery(ORDERS_GID,
+    `SELECT ${O.delay}, COUNT(${O.awb}) ${withClause(where, BREACHED)} GROUP BY ${O.delay}`);
+  const split = splitBreaches(tableRows(ownerT));
+  lastBreachSplit = { total, breach: breachCount, ...split };
+
+  $("kpiTotal").textContent = fmtInt(total);
+  $("kpiBreach").textContent = total ? fmtPct(breachCount / total) : "–";
+  $("kpiRider").textContent = total ? fmtPct(split.rider / total) : "–";
+  $("kpiStore").textContent = total ? fmtPct(split.store / total) : "–";
+  $("kpiAccept").textContent = fmtNum(avgAccept);
+  $("kpiIntent").textContent = fmtNum(avgIntent);
+
+  $("ovSub").textContent = total
+    ? `${fmtInt(total)} orders ${datePhrase()}. ${fmtPct(breachCount / total)} breached: riders ${fmtPct(split.rider / total)}, stores ${fmtPct(split.store / total)}.`
+    : `No orders found ${datePhrase()}. Try another date, or clear the city and store filters.`;
+
+  /* Rider numbers come from the DAU tab with the same date, city and store filters. */
+  const riderIds = await safe(async () => {
+    const t = await gvizQuery(RIDER_GID, `SELECT ${R.riderId}, COUNT(${R.riderId}) ${buildRiderWhere()} GROUP BY ${R.riderId}`);
+    return tableRows(t).length;
+  }, null);
+  $("kpiRiders").textContent = fmtInt(riderIds);
+
+  const avgLogin = await safe(async () => {
+    try {
+      const t = await gvizQuery(RIDER_GID, `SELECT AVG(${R.loginHours}) ${buildRiderWhere()}`);
+      return tableRows(t)[0]?.[0];
+    } catch (e) {
+      if (e instanceof StaleError) throw e;
+      const t = await gvizQuery(RIDER_GID, `SELECT ${R.loginHours} ${buildRiderWhere()}`);
+      const vals = tableRows(t).map(r => parseHours(r[0])).filter(v => v != null && v > 0);
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    }
+  }, null);
+  $("kpiLoginHrs").textContent = fmtNum(avgLogin);
+
+  const fresh = await safe(freshRiderCount, null);
+  $("kpiRidersSub").textContent = riderIds == null ? "DAU sheet unavailable"
+    : riderIds === 0 ? "No login rows for this selection"
+    : `${fmtInt(fresh)} on their first day`;
+}
+
+/* A rider is "first-day" when the selected date is the only date they appear on in the DAU tab. */
+async function freshRiderCount() {
+  const ref = currentDate || isoDate(new Date());
+  const scope = [];
+  if (currentCity) scope.push(`${R.city} = '${sq(currentCity)}'`);
+  if (currentHub) scope.push(`${R.hub} = '${sq(currentHub)}'`);
+  const extra = scope.length ? " AND " + scope.join(" AND ") : "";
+  const todayT = await gvizQuery(RIDER_GID,
+    `SELECT ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} = date '${ref}'${extra} GROUP BY ${R.riderId}`);
+  const otherT = await gvizQuery(RIDER_GID,
+    `SELECT ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} != date '${ref}' GROUP BY ${R.riderId}`);
+  const others = new Set(tableRows(otherT).map(r => String(r[0])));
+  return tableRows(todayT).map(r => String(r[0])).filter(id => !others.has(id)).length;
+}
+
+async function loadHourly() {
+  const where = buildWhere();
+  const totals = await gvizQuery(ORDERS_GID,
+    `SELECT ${O.hour}, COUNT(${O.awb}), COUNT(${O.breach}) ${where} GROUP BY ${O.hour} ORDER BY ${O.hour}`);
+  const totalMap = new Map(tableRows(totals).filter(r => r[0] != null).map(r => [r[0], { orders: r[1] || 0, breach: r[2] || 0 }]));
+
+  const ownerT = await gvizQuery(ORDERS_GID,
+    `SELECT ${O.hour}, ${O.delay}, COUNT(${O.awb}) ${withClause(where, BREACHED)} GROUP BY ${O.hour}, ${O.delay}`);
+  const riderMap = new Map(), storeMap = new Map();
+  tableRows(ownerT).forEach(([h, owner, n]) => {
+    if (owner === "Rider_delay") riderMap.set(h, (riderMap.get(h) || 0) + (n || 0));
+    else if (owner === "Store_delay") storeMap.set(h, (storeMap.get(h) || 0) + (n || 0));
+  });
+
+  const orders = ALL_HOURS.map(h => totalMap.get(h)?.orders || 0);
+  hourlyData = {
+    labels: ALL_HOURS.map(h => `${String(h).padStart(2, "0")}:00`),
+    orders,
+    breaches: ALL_HOURS.map(h => totalMap.get(h)?.breach || 0),
+    riderPct: ALL_HOURS.map((h, i) => (orders[i] ? (100 * (riderMap.get(h) || 0)) / orders[i] : null)),
+    storePct: ALL_HOURS.map((h, i) => (orders[i] ? (100 * (storeMap.get(h) || 0)) / orders[i] : null))
+  };
+  renderHourChart();
+  renderVolumeChart().catch(e => { if (!(e instanceof StaleError)) console.warn(e); });
+}
+
+/* ---------- charts: slate blues, soft indigos, light greys ---------- */
+Chart.defaults.font.family = '"Plus Jakarta Sans", system-ui, sans-serif';
+Chart.defaults.font.size = 11;
+Chart.defaults.color = "#94a3b8";
+const GRID = "#f1f5f9";
+const TIP = { backgroundColor: "#1e293b", titleColor: "#fff", bodyColor: "#e2e8f0", padding: 10, cornerRadius: 8, boxPadding: 4 };
+
+function renderHourChart() {
+  if (!hourlyData) return;
+  const bars = hourBarMetric === "orders" ? hourlyData.orders : hourlyData.breaches;
+  if (hourChart) hourChart.destroy();
+  hourChart = new Chart($("hourChart"), {
+    data: {
+      labels: hourlyData.labels,
+      datasets: [
+        { type: "bar", label: hourBarMetric === "orders" ? "Orders" : "Breaches", data: bars, backgroundColor: "#e2e8f0", hoverBackgroundColor: "#cbd5e1", borderRadius: 4, yAxisID: "y1", order: 3, maxBarThickness: 22 },
+        { type: "line", label: "Rider delay %", data: hourlyData.riderPct, borderColor: "#818cf8", backgroundColor: "#818cf8", borderWidth: 2, tension: 0.35, pointRadius: 0, pointHoverRadius: 4, spanGaps: false, yAxisID: "y2", order: 1 },
+        { type: "line", label: "Store delay %", data: hourlyData.storePct, borderColor: "#64748b", backgroundColor: "#64748b", borderWidth: 2, tension: 0.35, pointRadius: 0, pointHoverRadius: 4, spanGaps: false, yAxisID: "y2", order: 2 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        y1: { position: "left", border: { display: false }, grid: { color: GRID }, ticks: { padding: 8 } },
+        y2: { position: "right", min: 0, border: { display: false }, grid: { display: false }, ticks: { padding: 8, callback: v => v + "%" } },
+        x: { border: { display: false }, grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } }
+      },
+      plugins: { legend: { position: "top", align: "start", labels: { usePointStyle: true, pointStyle: "circle", boxWidth: 6, boxHeight: 6, padding: 16 } }, tooltip: TIP }
+    }
+  });
+}
+
+const VOL_SUB = {
+  orders: "Orders by creation hour",
+  riders: "Distinct riders who took an order in each hour",
+  breaches: "Breached orders by creation hour"
+};
+
+async function renderVolumeChart() {
+  if (!hourlyData) return;
+  $("volSub").textContent = VOL_SUB[volMetric];
+  let data;
+  if (volMetric === "riders") {
+    if (!ridersByHour) {
+      $("volSub").textContent = "Counting riders for each hour…";
+      ridersByHour = await safe(loadRidersByHour, ALL_HOURS.map(() => 0));
+      $("volSub").textContent = VOL_SUB.riders;
+    }
+    data = ridersByHour;
+  } else {
+    data = volMetric === "orders" ? hourlyData.orders : hourlyData.breaches;
+  }
+  if (volumeChart) volumeChart.destroy();
+  volumeChart = new Chart($("volumeChart"), {
+    type: "bar",
+    data: { labels: hourlyData.labels, datasets: [{ data, backgroundColor: "#a5b4fc", hoverBackgroundColor: "#818cf8", borderRadius: 4, maxBarThickness: 16 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: TIP },
+      scales: {
+        y: { border: { display: false }, grid: { color: GRID }, ticks: { padding: 8 } },
+        x: { border: { display: false }, grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } }
+      }
+    }
+  });
+}
+
+/* gviz has no COUNT(DISTINCT): fetch one row per (hour, rider) and count rows per hour. */
+async function loadRidersByHour() {
+  const where = withClause(buildWhere(), `${O.riderId} IS NOT NULL`);
+  const t = await gvizQuery(ORDERS_GID,
+    `SELECT ${O.hour}, ${O.riderId}, COUNT(${O.awb}) ${where} GROUP BY ${O.hour}, ${O.riderId}`);
+  const counts = new Map();
+  tableRows(t).forEach(([h]) => counts.set(h, (counts.get(h) || 0) + 1));
+  return ALL_HOURS.map(h => counts.get(h) || 0);
+}
+
+async function loadHubTable() {
+  const where = buildWhere();
+  const [main, owners] = await Promise.all([
+    gvizQuery(ORDERS_GID,
+      `SELECT ${O.hub}, ${O.city}, COUNT(${O.awb}), AVG(${O.creationToAccept}), AVG(${O.lm}), COUNT(${O.breach}) ${where} GROUP BY ${O.hub}, ${O.city} ORDER BY COUNT(${O.awb}) DESC LIMIT 20`),
+    gvizQuery(ORDERS_GID,
+      `SELECT ${O.hub}, ${O.delay}, COUNT(${O.awb}) ${withClause(where, BREACHED)} GROUP BY ${O.hub}, ${O.delay}`)
+  ]);
+  const riderMap = new Map(), storeMap = new Map();
+  tableRows(owners).forEach(([hub, owner, n]) => {
+    if (owner === "Rider_delay") riderMap.set(hub, (riderMap.get(hub) || 0) + (n || 0));
+    else if (owner === "Store_delay") storeMap.set(hub, (storeMap.get(hub) || 0) + (n || 0));
+  });
+
+  /* First-day riders per store: appear on the selected date only. */
+  const newRiders = await safe(async () => {
+    const ref = currentDate || isoDate(new Date());
+    const todayT = await gvizQuery(RIDER_GID,
+      `SELECT ${R.hub}, ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} = date '${ref}' GROUP BY ${R.hub}, ${R.riderId}`);
+    const otherT = await gvizQuery(RIDER_GID,
+      `SELECT ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} != date '${ref}' GROUP BY ${R.riderId}`);
+    const others = new Set(tableRows(otherT).map(r => String(r[0])));
+    const map = new Map();
+    tableRows(todayT).forEach(([hub, id]) => { if (!others.has(String(id))) map.set(hub, (map.get(hub) || 0) + 1); });
+    return map;
+  }, new Map());
+
+  const tbody = document.querySelector("#hubTable tbody");
+  const rows = tableRows(main);
+  if (!rows.length) { emptyRow("hubTable", 9, "No orders match these filters."); return; }
+  tbody.innerHTML = rows.map(([hub, city, orders, o2a, lm, breach]) => {
+    const pct = orders ? (100 * (breach || 0)) / orders : 0;
+    const riderPct = orders ? (100 * (riderMap.get(hub) || 0)) / orders : 0;
+    const storePct = orders ? (100 * (storeMap.get(hub) || 0)) / orders : 0;
+    return `<tr class="transition hover:bg-slate-50/70">
+      <td class="${TDL}">${storeLink(hub)}<span class="mt-0.5 block text-xs text-slate-400">${esc(city)}</span></td>
+      <td class="${TD}">${fmtInt(orders)}</td>
+      <td class="${TD}">${pct.toFixed(1)}%</td>
+      <td class="${TD}">${chip(kindDelay(riderPct), riderPct.toFixed(1) + "%")}</td>
+      <td class="${TD}">${chip(kindDelay(storePct), storePct.toFixed(1) + "%")}</td>
+      <td class="${TD}">${fmtNum(o2a)} min</td>
+      <td class="${TD}">${fmtNum(lm)} km</td>
+      <td class="${TD}">${fmtInt(newRiders.get(hub) || 0)}</td>
+      <td class="px-6 py-4 text-left">${status(kindBreach(pct), breachLabel(pct))}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ---------- Data check ---------- */
+async function loadDataCheck() {
+  const day = currentDate || isoDate(new Date());
+  $("dcWhen").textContent = "Checking…";
+  try {
+    const one = async (gid, q) => tableRows(await gvizQuery(gid, q))[0] || [];
+    const [[total], [noDate], [minD, maxD], [dayRows], [dauAll], [dauDay]] = await Promise.all([
+      one(ORDERS_GID, `SELECT COUNT(${O.awb})`),
+      one(ORDERS_GID, `SELECT COUNT(${O.awb}) WHERE ${O.creationDate} IS NULL`),
+      one(ORDERS_GID, `SELECT MIN(${O.creationDate}), MAX(${O.creationDate})`),
+      one(ORDERS_GID, `SELECT COUNT(${O.awb}) WHERE ${dateClause(O.creationDate, day)}`),
+      one(RIDER_GID, `SELECT COUNT(${R.riderId})`),
+      one(RIDER_GID, `SELECT COUNT(${R.riderId}) WHERE ${dateClause(R.eventDate, day)}`)
+    ]);
+    const fmtD = v => {
+      const t = parseTs(v);
+      return t ? new Date(t.ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "–";
+    };
+    $("dcTotal").textContent = fmtInt(total);
+    $("dcDay").textContent = fmtInt(dayRows);
+    $("dcNoDate").textContent = fmtInt(noDate);
+    $("dcRange").textContent = minD ? `${fmtD(minD)} to ${fmtD(maxD)}` : "–";
+    $("dcDau").textContent = fmtInt(dauAll);
+    $("dcDauDay").textContent = fmtInt(dauDay);
+    $("dcOwner").textContent = lastBreachSplit ? fmtInt(lastBreachSplit.other) : "Open Overview first";
+    $("dcWhen").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    const notes = [];
+    notes.push("Every date-filtered number on this page counts only rows whose creation date the sheet can read.");
+    if (noDate > 0) notes.push(`${fmtInt(noDate)} rows have no readable creation date, so they are left out of every date filter. If this is large, check the creation_Date column for text values.`);
+    if (!dauDay) notes.push("The DAU tab has no rows for this date, so rider counts and login time will be empty until the rider import fills it.");
+    $("dcNote").textContent = notes.join(" ");
+  } catch (e) {
+    if (e instanceof StaleError) return;
+    $("dcWhen").textContent = "Could not check";
+    $("dcNote").textContent = e.message;
+  }
+}
+
+/* ============================================================
+   STORE BY HOUR
+   ============================================================ */
+function showStoreEmpty(title, sub, showPick) {
+  $("shTitle").textContent = title;
+  $("shSub").textContent = sub;
+  $("shPick").hidden = !showPick;
+  $("shMetrics").hidden = true;
+  $("shChartPanel").hidden = true;
+  $("shNote").textContent = "";
+  emptyRow("hourlyReportTable", 12, "No store chosen yet.");
+}
+
+async function loadStoreHourly() {
+  if (!currentHub) {
+    showStoreEmpty("Store by hour", "Search for a store in the top bar to see its orders against projection, hour by hour.", true);
+    return;
+  }
+  const date = currentDate || isoDate(new Date());
+  const where = buildStoreWhere();
+
+  const projT = await gvizQuery(PROJECTION_GID,
+    `SELECT D, SUM(E) WHERE A = '${sq(currentHub)}' AND ${dateClause("C", date)} GROUP BY D ORDER BY D`);
+  const projMap = new Map(tableRows(projT).map(r => [r[0], r[1] || 0]));
+
+  const totT = await gvizQuery(ORDERS_GID,
+    `SELECT ${O.hour}, COUNT(${O.awb}), COUNT(${O.breach}), AVG(${O.lm}), AVG(${O.creationToAccept}) ${where} GROUP BY ${O.hour} ORDER BY ${O.hour}`);
+  const totMap = new Map(tableRows(totT).filter(r => r[0] != null)
+    .map(r => [r[0], { orders: r[1] || 0, breach: r[2] || 0, lm: r[3], o2a: r[4] }]));
+
+  /* Breach owner per hour, with the rain flag so rider delay in rain can be split out. */
+  const ownT = await gvizQuery(ORDERS_GID,
+    `SELECT ${O.hour}, ${O.rain}, ${O.delay}, COUNT(${O.awb}) ${withClause(where, BREACHED)} GROUP BY ${O.hour}, ${O.rain}, ${O.delay}`);
+  const riderMap = new Map(), storeMap = new Map(), rainMap = new Map();
+  tableRows(ownT).forEach(([h, rain, owner, n]) => {
+    if (owner === "Rider_delay") {
+      riderMap.set(h, (riderMap.get(h) || 0) + (n || 0));
+      if (isTrue(rain)) rainMap.set(h, (rainMap.get(h) || 0) + (n || 0));
+    } else if (owner === "Store_delay") {
+      storeMap.set(h, (storeMap.get(h) || 0) + (n || 0));
+    }
+  });
+
+  /* One row per order for this store and day: riders per hour and S2P (packed -> picked). */
+  const rawT = await gvizQuery(ORDERS_GID, `SELECT ${O.hour}, ${O.riderId}, ${O.bagsPacked}, ${O.pickedTime} ${where}`);
+  const ridersSet = new Map(), s2pSum = new Map(), s2pCnt = new Map();
+  let sawTime = false, pairs = 0;
+  const rawRows = tableRows(rawT);
+  rawRows.forEach(([h, rider, packed, picked]) => {
+    if (h == null) return;
+    if (rider != null) {
+      if (!ridersSet.has(h)) ridersSet.set(h, new Set());
+      ridersSet.get(h).add(rider);
+    }
+    const a = parseTs(packed), b = parseTs(picked);
+    if (!a || !b) return;
+    pairs++;
+    if (a.hasTime && b.hasTime) sawTime = true;
+    const mins = (b.ms - a.ms) / 60000;
+    if (mins < 0 || mins > 60) return;
+    s2pSum.set(h, (s2pSum.get(h) || 0) + mins);
+    s2pCnt.set(h, (s2pCnt.get(h) || 0) + 1);
+  });
+
+  const today = isoDate(new Date());
+  const nowHour = new Date().getHours();
+  const elapsed = h => date !== today || h <= nowHour;
+
+  const chartProj = [], chartOrders = [];
+  let sumOrders = 0, sumProjElapsed = 0, sumRider = 0, sumStore = 0;
+  let o2aW = 0, o2aN = 0, s2pW = 0, s2pN = 0;
+  const html = [];
+
+  ALL_HOURS.forEach(h => {
+    const t = totMap.get(h);
+    const orders = t?.orders || 0;
+    const projected = projMap.get(h) || 0;
+    const past = elapsed(h) || orders > 0;
+    chartProj.push(projMap.has(h) ? projected : null);
+    chartOrders.push(orders);
+
+    const riders = ridersSet.get(h)?.size || 0;
+    const rd = riderMap.get(h) || 0, rain = rainMap.get(h) || 0, sd = storeMap.get(h) || 0;
+    const s2p = s2pCnt.get(h) ? s2pSum.get(h) / s2pCnt.get(h) : null;
+    const o2a = t?.o2a ?? null;
+
+    sumOrders += orders;
+    if (past) sumProjElapsed += projected;
+    sumRider += rd; sumStore += sd;
+    if (o2a != null) { o2aW += o2a * orders; o2aN += orders; }
+    if (s2p != null) { s2pW += s2pSum.get(h); s2pN += s2pCnt.get(h); }
+
+    const dash = `<span class="text-slate-300">–</span>`;
+    const pctChip = n => (orders ? chip(kindDelay((100 * n) / orders), ((100 * n) / orders).toFixed(1) + "%") : dash);
+    const attain = projected && past ? (100 * orders) / projected : null;
+    const muted = !orders && !past ? " text-slate-300" : "";
+
+    html.push(`<tr class="transition hover:bg-slate-50/70">
+      <td class="px-6 py-3.5 text-left font-medium text-slate-900">${String(h).padStart(2, "0")}:00</td>
+      <td class="px-4 py-3.5 text-right text-slate-600${muted}">${projected ? fmtInt(projected) : dash}</td>
+      <td class="px-4 py-3.5 text-right text-slate-900${muted}">${past ? fmtInt(orders) : dash}</td>
+      <td class="px-4 py-3.5 text-right">${attain != null ? chip(kindAttain(attain), attain.toFixed(0) + "%") : dash}</td>
+      <td class="px-4 py-3.5 text-right text-slate-600">${riders ? fmtInt(riders) : dash}</td>
+      <td class="px-4 py-3.5 text-right text-slate-600">${riders ? (orders / riders).toFixed(2) : dash}</td>
+      <td class="px-4 py-3.5 text-right">${o2a != null ? chip(kindO2a(o2a), fmtNum(o2a)) : dash}</td>
+      <td class="px-4 py-3.5 text-right">${s2p != null ? chip(kindS2p(s2p), fmtNum(s2p)) : dash}</td>
+      <td class="px-4 py-3.5 text-right text-slate-600">${t?.lm != null ? fmtNum(t.lm) + " km" : dash}</td>
+      <td class="px-4 py-3.5 text-right">${pctChip(rd)}</td>
+      <td class="px-4 py-3.5 text-right">${pctChip(rain)}</td>
+      <td class="px-6 py-3.5 text-right">${pctChip(sd)}</td>
+    </tr>`);
+  });
+  document.querySelector("#hourlyReportTable tbody").innerHTML = html.join("");
+
+  $("shTitle").textContent = currentHub;
+  $("shSub").textContent = `Orders, projection, click to accept, S2P and delays for each hour ${datePhrase(date)}.`;
+  $("shPick").hidden = true;
+  $("shMetrics").hidden = false;
+  $("shChartPanel").hidden = false;
+
+  $("shAttain").textContent = sumProjElapsed ? `${((100 * sumOrders) / sumProjElapsed).toFixed(0)}%` : "–";
+  $("shAttainSub").textContent = sumProjElapsed
+    ? `${fmtInt(sumOrders)} orders of ${fmtInt(sumProjElapsed)} projected so far`
+    : `${fmtInt(sumOrders)} orders, no projection found`;
+  $("shO2a").textContent = o2aN ? fmtNum(o2aW / o2aN) : "–";
+  $("shS2p").textContent = s2pN ? fmtNum(s2pW / s2pN) : "–";
+  $("shRider").textContent = sumOrders ? ((100 * sumRider) / sumOrders).toFixed(1) + "%" : "–";
+  $("shStore").textContent = sumOrders ? ((100 * sumStore) / sumOrders).toFixed(1) + "%" : "–";
+
+  const notes = [];
+  if (!projMap.size) notes.push("No projection was found for this store on this date.");
+  if (pairs && !sawTime) notes.push("S2P is blank: BAGS_PACKED_READY_FOR_PICKUP and Picked_Time arrive from the sheet as dates without a time of day. Format both columns as Date time in the Base Dump tab and S2P will fill in.");
+  else if (!pairs && rawRows.length) notes.push("S2P is blank: none of this store's orders have both a packed time and a picked time.");
+  $("shNote").textContent = notes.join(" ");
+
+  if (projChart) projChart.destroy();
+  projChart = new Chart($("projChart"), {
+    data: {
+      labels: ALL_HOURS.map(h => `${String(h).padStart(2, "0")}:00`),
+      datasets: [
+        { type: "bar", label: "Orders", data: chartOrders, backgroundColor: "#cbd5e1", hoverBackgroundColor: "#94a3b8", borderRadius: 4, maxBarThickness: 22, order: 2 },
+        { type: "line", label: "Projected", data: chartProj, borderColor: "#6366f1", backgroundColor: "#6366f1", borderWidth: 2, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, order: 1 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        y: { border: { display: false }, grid: { color: GRID }, ticks: { padding: 8 } },
+        x: { border: { display: false }, grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } }
+      },
+      plugins: { legend: { position: "top", align: "start", labels: { usePointStyle: true, pointStyle: "circle", boxWidth: 6, boxHeight: 6, padding: 16 } }, tooltip: TIP }
+    }
+  });
+}
+
+/* ============================================================
+   STORES
+   ============================================================ */
+const MIN_ORDERS_FOR_RANKING = 15;
+let worstByCity = null, worstCity = "", worstCityListLoaded = false;
+
+async function loadWorstStores() {
+  const where = buildWhere();
+  const t = await gvizQuery(ORDERS_GID,
+    `SELECT ${O.hub}, ${O.city}, COUNT(${O.awb}), COUNT(${O.breach}) ${where} GROUP BY ${O.hub}, ${O.city}`);
+  const rows = tableRows(t)
+    .map(([hub, city, orders, breach]) => ({ hub, city, orders: orders || 0, pct: orders ? (100 * (breach || 0)) / orders : 0 }))
+    .filter(r => r.orders >= MIN_ORDERS_FOR_RANKING);
+
+  renderRank("worstStoresTable", [...rows].sort((a, b) => b.pct - a.pct).slice(0, 15));
+
+  const byCity = new Map();
+  rows.forEach(r => { if (!byCity.has(r.city)) byCity.set(r.city, []); byCity.get(r.city).push(r); });
+  byCity.forEach((list, city) => byCity.set(city, list.sort((a, b) => b.pct - a.pct).slice(0, 5)));
+  worstByCity = byCity;
+
+  if (!worstCityListLoaded) {
+    const sel = $("worstCitySelect");
+    [...byCity.keys()].filter(Boolean).sort().forEach(c => {
+      const o = document.createElement("option");
+      o.value = o.textContent = c;
+      sel.appendChild(o);
+    });
+    worstCityListLoaded = true;
+  }
+  renderWorstByCity();
+}
+
+function renderWorstByCity() {
+  if (!worstCity || !worstByCity) { emptyRow("worstStoresByCityTable", 4, "Choose a city to see its weakest stores."); return; }
+  renderRank("worstStoresByCityTable", worstByCity.get(worstCity) || []);
+}
+
+function renderRank(tableId, rows) {
+  if (!rows.length) { emptyRow(tableId, 4, "No store has enough orders to rank for these filters."); return; }
+  document.querySelector(`#${tableId} tbody`).innerHTML = rows.map(r => `<tr class="transition hover:bg-slate-50/70">
+    <td class="${TDL}">${storeLink(r.hub)}<span class="mt-0.5 block text-xs text-slate-400">${esc(r.city)}</span></td>
+    <td class="${TD}">${fmtInt(r.orders)}</td>
+    <td class="${TD}">${r.pct.toFixed(1)}%</td>
+    <td class="px-6 py-4 text-left">${status(kindBreach(r.pct), breachLabel(r.pct))}</td>
+  </tr>`).join("");
+}
+
+/* ============================================================
+   RIDERS
+   ============================================================ */
+async function loadRiderTable() {
+  const where = buildWhere();
+  const t = await gvizQuery(ORDERS_GID,
+    `SELECT ${O.riderId}, ${O.name}, ${O.hub}, COUNT(${O.awb}), AVG(${O.creationToAccept}), AVG(${O.reachToIntent}), COUNT(${O.breach}) ${withClause(where, `${O.riderId} IS NOT NULL`)} GROUP BY ${O.riderId}, ${O.name}, ${O.hub} ORDER BY COUNT(${O.awb}) DESC LIMIT 25`);
+
+  /* Login time per rider from the DAU tab, for the selected day only. */
+  const loginMap = await safe(async () => {
+    const map = new Map();
+    try {
+      const l = await gvizQuery(RIDER_GID, `SELECT ${R.riderId}, SUM(${R.loginHours}) ${buildRiderWhere()} GROUP BY ${R.riderId}`);
+      tableRows(l).forEach(([id, h]) => map.set(String(id), h));
+    } catch (e) {
+      if (e instanceof StaleError) throw e;
+      const l = await gvizQuery(RIDER_GID, `SELECT ${R.riderId}, ${R.loginHours} ${buildRiderWhere()}`);
+      tableRows(l).forEach(([id, h]) => {
+        const v = parseHours(h);
+        if (v != null) map.set(String(id), (map.get(String(id)) || 0) + v);
+      });
+    }
+    return map;
+  }, new Map());
+
+  const rows = tableRows(t);
+  if (!rows.length) { emptyRow("riderTable", 8, "No rider orders match these filters."); return; }
+  document.querySelector("#riderTable tbody").innerHTML = rows.map(([id, name, hub, orders, o2a, intent, breach]) => {
+    const pct = orders ? (100 * (breach || 0)) / orders : 0;
+    const login = loginMap.get(String(id));
+    return `<tr class="transition hover:bg-slate-50/70">
+      <td class="${TDL}"><span class="font-medium text-slate-900">${esc(name || id)}</span><span class="mt-0.5 block text-xs text-slate-400">ID ${esc(id)}</span></td>
+      <td class="px-4 py-4 text-left text-slate-600">${hub ? storeLink(hub) : ""}</td>
+      <td class="${TD}">${fmtInt(orders)}</td>
+      <td class="${TD}">${fmtNum(o2a)} min</td>
+      <td class="${TD}">${fmtNum(intent)} min</td>
+      <td class="${TD}">${pct.toFixed(1)}%</td>
+      <td class="${TD}">${login != null && login > 0 ? fmtNum(login, 1) + " hrs" : "–"}</td>
+      <td class="px-6 py-4 text-left">${status(kindBreach(pct), breachLabel(pct))}</td>
+    </tr>`;
+  }).join("");
+  $("riderNote").textContent = loginMap.size ? "" : "Login time is blank because the DAU sheet has no rows for this date. It fills in once the rider import finishes.";
+}
+
+/* ============================================================
+   CSV EXPORT
+   ============================================================ */
+function tableCsv(id) {
+  return [...document.querySelectorAll(`#${id} tr`)]
+    .filter(tr => !tr.querySelector("[data-empty]"))
+    .map(tr => [...tr.children].map(c => `"${(c.textContent || "").replace(/\s+/g, " ").trim().replace(/"/g, '""')}"`).join(","));
+}
+
+function downloadCsv() {
+  const out = [`Live CT dashboard export,${new Date().toLocaleString()}`,
+    `Filters,City=${currentCity || "All"},Store=${currentHub || "All"},Orders=${currentLive || "All"},Date=${currentDate || "All"}`, ""];
+  const kpis = [["Orders", "kpiTotal"], ["Breach rate", "kpiBreach"], ["Rider delay", "kpiRider"], ["Store delay", "kpiStore"],
+    ["Click to accept (min)", "kpiAccept"], ["Reach to intent (min)", "kpiIntent"], ["Riders logged in", "kpiRiders"], ["Average login time (hrs)", "kpiLoginHrs"]];
+  if ($("kpiTotal").textContent !== "–") {
+    out.push("Summary");
+    kpis.forEach(([label, id]) => out.push(`"${label}","${$(id).textContent}"`));
+    out.push("");
+  }
+  [["Store by hour: " + (currentHub || ""), "hourlyReportTable"], ["Store performance", "hubTable"],
+   ["15 weakest stores", "worstStoresTable"], ["Weakest stores in " + (worstCity || "city"), "worstStoresByCityTable"],
+   ["Riders", "riderTable"]].forEach(([title, id]) => {
+    const rows = tableCsv(id);
+    if (rows.length > 1) out.push(title, ...rows, "");
+  });
+  const blob = new Blob([out.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `ct-dashboard-${isoDate(new Date())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ============================================================
+   WIRING
+   ============================================================ */
+$("nav").addEventListener("click", e => {
+  const b = e.target.closest(".nav-btn");
+  if (b) showView(b.dataset.view);
+});
+
+document.addEventListener("click", e => {
+  const link = e.target.closest(".store-link");
+  if (link) selectStore(link.dataset.hub);
+});
+
+$("searchInput").addEventListener("input", e => { $("clearStore").hidden = !e.target.value; e.target.setCustomValidity(""); });
+$("searchInput").addEventListener("change", e => {
+  const v = e.target.value.trim();
+  if (!v) { currentHub = ""; $("clearStore").hidden = true; invalidate(); return; }
+  if (knownHubs.size && !knownHubs.has(v)) {
+    e.target.setCustomValidity("Pick a store from the list");
+    e.target.reportValidity();
+    return;
+  }
+  selectStore(v);
+});
+$("clearStore").addEventListener("click", () => {
+  currentHub = "";
+  $("searchInput").value = "";
+  $("clearStore").hidden = true;
+  invalidate();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "/" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); $("searchInput").focus(); }
+});
+
+$("filterCity").addEventListener("change", e => { currentCity = e.target.value; invalidate(); });
+$("filterLive").addEventListener("change", e => { currentLive = e.target.value; invalidate(); });
+$("filterDate").addEventListener("change", e => { currentDate = e.target.value; invalidate(); });
+$("todayBtn").addEventListener("click", () => { currentDate = isoDate(new Date()); $("filterDate").value = currentDate; invalidate(); });
+$("yestBtn").addEventListener("click", () => {
+  const d = new Date(); d.setDate(d.getDate() - 1);
+  currentDate = isoDate(d); $("filterDate").value = currentDate; invalidate();
+});
+
+$("refreshBtn").addEventListener("click", invalidate);
+$("csvBtn").addEventListener("click", downloadCsv);
+$("shPick").addEventListener("click", () => $("searchInput").focus());
+
+$("hourSeg").addEventListener("click", e => {
+  const b = e.target.closest(".seg-btn");
+  if (!b) return;
+  setSeg("hourSeg", b);
+  hourBarMetric = b.dataset.metric;
+  renderHourChart();
+});
+$("volSeg").addEventListener("click", e => {
+  const b = e.target.closest(".seg-btn");
+  if (!b) return;
+  setSeg("volSeg", b);
+  volMetric = b.dataset.volMetric;
+  renderVolumeChart().catch(err => { if (!(err instanceof StaleError)) console.warn(err); });
+});
+
+$("worstCitySelect").addEventListener("change", e => { worstCity = e.target.value; renderWorstByCity(); });
+$("dataCheck").addEventListener("toggle", () => { if ($("dataCheck").open) loadDataCheck(); });
+
+$("filterDate").value = currentDate;
+showView("overview");
+setInterval(() => { if (!document.hidden) invalidate(); }, REFRESH_MS);
+</script>
 </body>
 </html>
