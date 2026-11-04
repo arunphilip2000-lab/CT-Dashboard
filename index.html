@@ -241,6 +241,7 @@
             <div><dt class="text-xs text-slate-500">Rows in DAU (all dates)</dt><dd id="dcDau" class="mt-1 font-semibold text-slate-900">–</dd></div>
             <div><dt class="text-xs text-slate-500">DAU rows on the selected date</dt><dd id="dcDauDay" class="mt-1 font-semibold text-slate-900">–</dd></div>
             <div><dt class="text-xs text-slate-500">Breached orders with no delay owner</dt><dd id="dcOwner" class="mt-1 font-semibold text-slate-900">–</dd></div>
+            <div class="col-span-2"><dt class="text-xs text-slate-500">Packed and picked values the sheet sends (first 2 orders)</dt><dd id="dcTs" class="mt-1 font-semibold text-slate-900">–</dd></div>
             <div><dt class="text-xs text-slate-500">Checked</dt><dd id="dcWhen" class="mt-1 font-semibold text-slate-900">–</dd></div>
           </dl>
           <p id="dcNote" class="mt-5 max-w-3xl text-xs leading-relaxed text-slate-500"></p>
@@ -574,7 +575,15 @@ function parseHours(v) {
 function parseTs(v) {
   if (v == null || v === "") return null;
   if (v instanceof Date) return { ms: v.getTime(), hasTime: true };
+  /* Clock-time-only cells (e.g. 12:00:23 PM) arrive as [hours, minutes, seconds, ms]. */
+  if (Array.isArray(v)) return { ms: (((v[0] || 0) * 60 + (v[1] || 0)) * 60 + (v[2] || 0)) * 1000 + (v[3] || 0), hasTime: true };
   if (typeof v !== "string") return null;
+  const clock = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i.exec(v.trim());
+  if (clock) {
+    let h = +clock[1];
+    if (clock[4]) h = (h % 12) + (clock[4].toUpperCase() === "PM" ? 12 : 0);
+    return { ms: ((h * 60 + +clock[2]) * 60 + (+clock[3] || 0)) * 1000, hasTime: true };
+  }
   const m = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+)(?:,(\d+))?)?\)$/.exec(v);
   if (m) {
     return {
@@ -946,6 +955,7 @@ async function loadDataCheck() {
   $("dcWhen").textContent = "Checking…";
   try {
     const one = async (gid, q) => tableRows(await gvizQuery(gid, q))[0] || [];
+    const tsPromise = gvizQuery(ORDERS_GID, `SELECT ${O.bagsPacked}, ${O.pickedTime} WHERE ${O.bagsPacked} IS NOT NULL AND ${O.pickedTime} IS NOT NULL LIMIT 2`);
     const [[total], [noDate], [minD, maxD], [dayRows], [dauAll], [dauDay]] = await Promise.all([
       one(ORDERS_GID, `SELECT COUNT(${O.awb})`),
       one(ORDERS_GID, `SELECT COUNT(${O.awb}) WHERE ${O.creationDate} IS NULL`),
@@ -958,6 +968,12 @@ async function loadDataCheck() {
       const t = parseTs(v);
       return t ? new Date(t.ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "–";
     };
+    const tsT = await tsPromise;
+    const cellText = c => (c ? (c.f ?? String(c.v ?? "")) : "–");
+    const hasTime = tsT.rows.length && tsT.rows.every(r => r.c.every(c => c && parseTs(c.v)?.hasTime));
+    $("dcTs").textContent = tsT.rows.length
+      ? tsT.rows.map(r => `${cellText(r.c[0])} to ${cellText(r.c[1])}`).join("  |  ") + (hasTime ? "  (time of day present)" : "  (no time of day, so S2P can't be measured)")
+      : "No order has both a packed and a picked time";
     $("dcTotal").textContent = fmtInt(total);
     $("dcDay").textContent = fmtInt(dayRows);
     $("dcNoDate").textContent = fmtInt(noDate);
@@ -1025,7 +1041,7 @@ async function loadStoreHourly() {
   /* One row per order for this store and day: riders per hour and S2P (packed -> picked). */
   const rawT = await gvizQuery(ORDERS_GID, `SELECT ${O.hour}, ${O.riderId}, ${O.bagsPacked}, ${O.pickedTime} ${where}`);
   const ridersSet = new Map(), s2pSum = new Map(), s2pCnt = new Map();
-  let sawTime = false, pairs = 0;
+  let pairs = 0, timed = 0;
   const rawRows = tableRows(rawT);
   rawRows.forEach(([h, rider, packed, picked]) => {
     if (h == null) return;
@@ -1036,8 +1052,10 @@ async function loadStoreHourly() {
     const a = parseTs(packed), b = parseTs(picked);
     if (!a || !b) return;
     pairs++;
-    if (a.hasTime && b.hasTime) sawTime = true;
-    const mins = (b.ms - a.ms) / 60000;
+    if (!(a.hasTime && b.hasTime)) return;   // date-only values would read as a false 0 minutes
+    timed++;
+    let mins = (b.ms - a.ms) / 60000;
+    if (mins < -720) mins += 1440;            // packed before midnight, picked after
     if (mins < 0 || mins > 60) return;
     s2pSum.set(h, (s2pSum.get(h) || 0) + mins);
     s2pCnt.set(h, (s2pCnt.get(h) || 0) + 1);
@@ -1110,8 +1128,9 @@ async function loadStoreHourly() {
 
   const notes = [];
   if (!projMap.size) notes.push("No projection was found for this store on this date.");
-  if (pairs && !sawTime) notes.push("S2P is blank: BAGS_PACKED_READY_FOR_PICKUP and Picked_Time arrive from the sheet as dates without a time of day. Format both columns as Date time in the Base Dump tab and S2P will fill in.");
+  if (pairs && !timed) notes.push("S2P is blank, not zero: the sheet sends BAGS_PACKED_READY_FOR_PICKUP and Picked_Time as dates only, with no time of day, so packed to picked can't be measured. To test, type =TEXT('Base Dump'!J2,\"yyyy-mm-dd hh:mm:ss\") in an empty cell. If it shows a real time, format columns J and S as Date time (Format, Number, Date time). If it shows 00:00:00, the import is dropping the time. Open Data check on Overview to see the raw values.");
   else if (!pairs && rawRows.length) notes.push("S2P is blank: none of this store's orders have both a packed time and a picked time.");
+  else if (timed < pairs) notes.push(`${pairs - timed} orders were left out of S2P because their timestamps have no time of day.`);
   $("shNote").textContent = notes.join(" ");
 
   if (projChart) projChart.destroy();
