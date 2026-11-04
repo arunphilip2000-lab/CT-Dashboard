@@ -155,9 +155,9 @@
           <p class="mt-1 text-xs text-slate-400">Average, store arrival to intent</p>
         </div>
         <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
-          <p class="text-xs font-medium text-slate-500">Riders logged in</p>
+          <p id="kpiRidersLabel" class="text-xs font-medium text-slate-500">Riders logged in</p>
           <p id="kpiRiders" class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">–</p>
-          <p id="kpiRidersSub" class="mt-1 text-xs text-slate-400">From the DAU sheet</p>
+          <p id="kpiRidersSub" class="mt-1 text-xs text-slate-400">Distinct riders, selected day</p>
         </div>
         <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
           <p class="text-xs font-medium text-slate-500">Average login time</p>
@@ -215,7 +215,7 @@
                 <th class="px-4 py-3 text-right font-medium">Store delay</th>
                 <th class="px-4 py-3 text-right font-medium">Click to accept</th>
                 <th class="px-4 py-3 text-right font-medium">Avg last mile</th>
-                <th class="px-4 py-3 text-right font-medium">First-day riders</th>
+                <th id="hubRidersHead" class="px-4 py-3 text-right font-medium">Riders</th>
                 <th class="px-6 py-3 text-left font-medium">Status</th>
               </tr>
             </thead>
@@ -259,11 +259,16 @@
         <button id="shPick" class="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-600">Search for a store</button>
       </div>
 
-      <div id="shMetrics" hidden class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div id="shMetrics" hidden class="grid grid-cols-2 gap-4 lg:grid-cols-6">
         <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
           <p class="text-xs font-medium text-slate-500">Orders vs projection</p>
           <p id="shAttain" class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">–</p>
           <p id="shAttainSub" class="mt-1 text-xs text-slate-400"></p>
+        </div>
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+          <p class="text-xs font-medium text-slate-500">Riders</p>
+          <p id="shRiders" class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">–</p>
+          <p class="mt-1 text-xs text-slate-400">Took at least one order</p>
         </div>
         <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
           <p class="text-xs font-medium text-slate-500">Click to accept</p>
@@ -682,6 +687,7 @@ function resetData() {
   epoch++;
   Object.keys(loadedViews).forEach(k => delete loadedViews[k]);
   ridersByHour = null;
+  riderCountsPromise = null;
   if ($("dataCheck").open) loadDataCheck();
 }
 function invalidate() { resetData(); loadActiveView(true); }
@@ -756,12 +762,13 @@ async function loadKpis() {
     ? `${fmtInt(total)} orders ${datePhrase()}. ${fmtPct(breachCount / total)} breached: riders ${fmtPct(split.rider / total)}, stores ${fmtPct(split.store / total)}.`
     : `No orders found ${datePhrase()}. Try another date, or clear the city and store filters.`;
 
-  /* Rider numbers come from the DAU tab with the same date, city and store filters. */
-  const riderIds = await safe(async () => {
-    const t = await gvizQuery(RIDER_GID, `SELECT ${R.riderId}, COUNT(${R.riderId}) ${buildRiderWhere()} GROUP BY ${R.riderId}`);
-    return tableRows(t).length;
-  }, null);
-  $("kpiRiders").textContent = fmtInt(riderIds);
+  /* Riders logged in: from the DAU tab, or riders with orders if DAU has no rows. */
+  const rc = await getRiderCounts();
+  $("kpiRidersLabel").textContent = rc.source === "dau" ? "Riders logged in" : "Riders with orders";
+  $("kpiRiders").textContent = fmtInt(rc.total);
+  $("kpiRidersSub").textContent = rc.source === "dau"
+    ? "Distinct riders on the DAU sheet"
+    : "DAU sheet has no rows for this selection, so this counts riders who took an order";
 
   const avgLogin = await safe(async () => {
     try {
@@ -776,25 +783,41 @@ async function loadKpis() {
   }, null);
   $("kpiLoginHrs").textContent = fmtNum(avgLogin);
 
-  const fresh = await safe(freshRiderCount, null);
-  $("kpiRidersSub").textContent = riderIds == null ? "DAU sheet unavailable"
-    : riderIds === 0 ? "No login rows for this selection"
-    : `${fmtInt(fresh)} on their first day`;
 }
 
-/* A rider is "first-day" when the selected date is the only date they appear on in the DAU tab. */
-async function freshRiderCount() {
-  const ref = currentDate || isoDate(new Date());
-  const scope = [];
-  if (currentCity) scope.push(`${R.city} = '${sq(currentCity)}'`);
-  if (currentHub) scope.push(`${R.hub} = '${sq(currentHub)}'`);
-  const extra = scope.length ? " AND " + scope.join(" AND ") : "";
-  const todayT = await gvizQuery(RIDER_GID,
-    `SELECT ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} = date '${ref}'${extra} GROUP BY ${R.riderId}`);
-  const otherT = await gvizQuery(RIDER_GID,
-    `SELECT ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} != date '${ref}' GROUP BY ${R.riderId}`);
-  const others = new Set(tableRows(otherT).map(r => String(r[0])));
-  return tableRows(todayT).map(r => String(r[0])).filter(id => !others.has(id)).length;
+/* One shared count of distinct riders, in total and per store.
+   Source 1: the DAU (login) tab. If it has no rows for this selection, source 2: riders
+   who took at least one order in the Base Dump. Cached until the filters change. */
+let riderCountsPromise = null;
+function getRiderCounts() {
+  if (!riderCountsPromise) riderCountsPromise = computeRiderCounts();
+  return riderCountsPromise;
+}
+
+async function computeRiderCounts() {
+  const build = (rows, source) => {
+    const all = new Set(), byHubSets = new Map();
+    rows.forEach(([hub, id]) => {
+      if (id == null) return;
+      all.add(String(id));
+      if (!byHubSets.has(hub)) byHubSets.set(hub, new Set());
+      byHubSets.get(hub).add(String(id));
+    });
+    const byHub = new Map();
+    byHubSets.forEach((set, hub) => byHub.set(hub, set.size));
+    return { source, total: all.size, byHub };
+  };
+
+  const dauRows = await safe(async () => {
+    const t = await gvizQuery(RIDER_GID,
+      `SELECT ${R.hub}, ${R.riderId}, COUNT(${R.riderId}) ${buildRiderWhere()} GROUP BY ${R.hub}, ${R.riderId}`);
+    return tableRows(t);
+  }, []);
+  if (dauRows.length) return build(dauRows, "dau");
+
+  const t = await gvizQuery(ORDERS_GID,
+    `SELECT ${O.hub}, ${O.riderId}, COUNT(${O.awb}) ${withClause(buildWhere(), `${O.riderId} IS NOT NULL`)} GROUP BY ${O.hub}, ${O.riderId}`);
+  return build(tableRows(t), "orders");
 }
 
 async function loadHourly() {
@@ -915,18 +938,8 @@ async function loadHubTable() {
     else if (owner === "Store_delay") storeMap.set(hub, (storeMap.get(hub) || 0) + (n || 0));
   });
 
-  /* First-day riders per store: appear on the selected date only. */
-  const newRiders = await safe(async () => {
-    const ref = currentDate || isoDate(new Date());
-    const todayT = await gvizQuery(RIDER_GID,
-      `SELECT ${R.hub}, ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} = date '${ref}' GROUP BY ${R.hub}, ${R.riderId}`);
-    const otherT = await gvizQuery(RIDER_GID,
-      `SELECT ${R.riderId}, COUNT(${R.eventDate}) WHERE ${R.eventDate} != date '${ref}' GROUP BY ${R.riderId}`);
-    const others = new Set(tableRows(otherT).map(r => String(r[0])));
-    const map = new Map();
-    tableRows(todayT).forEach(([hub, id]) => { if (!others.has(String(id))) map.set(hub, (map.get(hub) || 0) + 1); });
-    return map;
-  }, new Map());
+  const rc = await getRiderCounts();
+  $("hubRidersHead").textContent = rc.source === "dau" ? "Riders logged in" : "Riders with orders";
 
   const tbody = document.querySelector("#hubTable tbody");
   const rows = tableRows(main);
@@ -943,7 +956,7 @@ async function loadHubTable() {
       <td class="${TD}">${chip(kindDelay(storePct), storePct.toFixed(1) + "%")}</td>
       <td class="${TD}">${fmtNum(o2a)} min</td>
       <td class="${TD}">${fmtNum(lm)} km</td>
-      <td class="${TD}">${fmtInt(newRiders.get(hub) || 0)}</td>
+      <td class="${TD}">${fmtInt(rc.byHub.get(hub) || 0)}</td>
       <td class="px-6 py-4 text-left">${status(kindBreach(pct), breachLabel(pct))}</td>
     </tr>`;
   }).join("");
@@ -1121,6 +1134,9 @@ async function loadStoreHourly() {
   $("shAttainSub").textContent = sumProjElapsed
     ? `${fmtInt(sumOrders)} orders of ${fmtInt(sumProjElapsed)} projected so far`
     : `${fmtInt(sumOrders)} orders, no projection found`;
+  const storeRiders = new Set();
+  ridersSet.forEach(set => set.forEach(id => storeRiders.add(id)));
+  $("shRiders").textContent = fmtInt(storeRiders.size);
   $("shO2a").textContent = o2aN ? fmtNum(o2aW / o2aN) : "–";
   $("shS2p").textContent = s2pN ? fmtNum(s2pW / s2pN) : "–";
   $("shRider").textContent = sumOrders ? ((100 * sumRider) / sumOrders).toFixed(1) + "%" : "–";
