@@ -241,6 +241,8 @@
             <div><dt class="text-xs text-slate-500">Rows in DAU (all dates)</dt><dd id="dcDau" class="mt-1 font-semibold text-slate-900">–</dd></div>
             <div><dt class="text-xs text-slate-500">DAU rows on the selected date</dt><dd id="dcDauDay" class="mt-1 font-semibold text-slate-900">–</dd></div>
             <div><dt class="text-xs text-slate-500">Breached orders with no delay owner</dt><dd id="dcOwner" class="mt-1 font-semibold text-slate-900">–</dd></div>
+            <div><dt class="text-xs text-slate-500">Rider IDs counted (each ID once)</dt><dd id="dcRiders" class="mt-1 font-semibold text-slate-900">–</dd></div>
+            <div><dt class="text-xs text-slate-500">Rider and store pairs behind it</dt><dd id="dcPairs" class="mt-1 font-semibold text-slate-900">–</dd></div>
             <div class="col-span-2"><dt class="text-xs text-slate-500">Packed and picked values the sheet sends (first 2 orders)</dt><dd id="dcTs" class="mt-1 font-semibold text-slate-900">–</dd></div>
             <div><dt class="text-xs text-slate-500">Checked</dt><dd id="dcWhen" class="mt-1 font-semibold text-slate-900">–</dd></div>
           </dl>
@@ -602,6 +604,14 @@ function parseTs(v) {
 
 const isTrue = v => v === true || String(v).toLowerCase() === "true";
 
+/* A rider ID cleaned for counting: trimmed text, so 123 and " 123 " are the same rider.
+   Blank, 0 and null IDs are ignored. */
+function riderKey(v) {
+  if (v == null) return null;
+  const k = String(v).trim();
+  return !k || k === "0" || /^(null|undefined|nan)$/i.test(k) ? null : k;
+}
+
 async function safe(fn, fallback) {
   try { return await fn(); } catch (e) { if (e instanceof StaleError) throw e; console.warn(e); return fallback; }
 }
@@ -797,15 +807,17 @@ function getRiderCounts() {
 async function computeRiderCounts() {
   const build = (rows, source) => {
     const all = new Set(), byHubSets = new Map();
-    rows.forEach(([hub, id]) => {
-      if (id == null) return;
-      all.add(String(id));
+    rows.forEach(([hub, rawId]) => {
+      const id = riderKey(rawId);
+      if (!id) return;
+      all.add(id);
       if (!byHubSets.has(hub)) byHubSets.set(hub, new Set());
-      byHubSets.get(hub).add(String(id));
+      byHubSets.get(hub).add(id);
     });
     const byHub = new Map();
-    byHubSets.forEach((set, hub) => byHub.set(hub, set.size));
-    return { source, total: all.size, byHub };
+    let pairs = 0;
+    byHubSets.forEach((set, hub) => { byHub.set(hub, set.size); pairs += set.size; });
+    return { source, total: all.size, byHub, pairs };
   };
 
   const dauRows = await safe(async () => {
@@ -919,9 +931,14 @@ async function loadRidersByHour() {
   const where = withClause(buildWhere(), `${O.riderId} IS NOT NULL`);
   const t = await gvizQuery(ORDERS_GID,
     `SELECT ${O.hour}, ${O.riderId}, COUNT(${O.awb}) ${where} GROUP BY ${O.hour}, ${O.riderId}`);
-  const counts = new Map();
-  tableRows(t).forEach(([h]) => counts.set(h, (counts.get(h) || 0) + 1));
-  return ALL_HOURS.map(h => counts.get(h) || 0);
+  const sets = new Map();
+  tableRows(t).forEach(([h, rawId]) => {
+    const id = riderKey(rawId);
+    if (!id) return;
+    if (!sets.has(h)) sets.set(h, new Set());
+    sets.get(h).add(id);
+  });
+  return ALL_HOURS.map(h => sets.get(h)?.size || 0);
 }
 
 async function loadHubTable() {
@@ -994,11 +1011,15 @@ async function loadDataCheck() {
     $("dcDau").textContent = fmtInt(dauAll);
     $("dcDauDay").textContent = fmtInt(dauDay);
     $("dcOwner").textContent = lastBreachSplit ? fmtInt(lastBreachSplit.other) : "Open Overview first";
+    const rc = await getRiderCounts();
+    $("dcRiders").textContent = `${fmtInt(rc.total)} (${rc.source === "dau" ? "from the DAU sheet" : "riders with orders"})`;
+    $("dcPairs").textContent = fmtInt(rc.pairs);
     $("dcWhen").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
     const notes = [];
     notes.push("Every date-filtered number on this page counts only rows whose creation date the sheet can read.");
     if (noDate > 0) notes.push(`${fmtInt(noDate)} rows have no readable creation date, so they are left out of every date filter. If this is large, check the creation_Date column for text values.`);
+    if (rc.pairs > rc.total) notes.push(`${fmtInt(rc.pairs - rc.total)} rider and store pairs are repeats of a rider who appears at more than one store. Each rider is counted once in the total and once in each store's own count.`);
     if (!dauDay) notes.push("The DAU tab has no rows for this date, so rider counts and login time will be empty until the rider import fills it.");
     $("dcNote").textContent = notes.join(" ");
   } catch (e) {
@@ -1058,9 +1079,10 @@ async function loadStoreHourly() {
   const rawRows = tableRows(rawT);
   rawRows.forEach(([h, rider, packed, picked]) => {
     if (h == null) return;
-    if (rider != null) {
+    const rid = riderKey(rider);
+    if (rid) {
       if (!ridersSet.has(h)) ridersSet.set(h, new Set());
-      ridersSet.get(h).add(rider);
+      ridersSet.get(h).add(rid);
     }
     const a = parseTs(packed), b = parseTs(picked);
     if (!a || !b) return;
